@@ -49,8 +49,10 @@ func main() {
 	var listLister server.ListLister
 	var readyLister server.ReadyLister
 	var bootstrapManager server.BootstrapManager
+	var store *postgres.Store
 	if postgresDSN != "" {
-		store, err := postgres.NewStore(ctx, postgresDSN)
+		var err error
+		store, err = postgres.NewStore(ctx, postgresDSN)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to connect to postgres: %v\n", err)
 			os.Exit(1)
@@ -90,6 +92,7 @@ func main() {
 	srv := server.New(server.Config{
 		Addr:                addr,
 		PostgresDSN:         postgresDSN,
+		AuthResolver:        store,
 		ProjectConfigReader: projectConfigStore,
 		ProjectConfigWriter: projectConfigWriter,
 		EpicLister:          epicLister,

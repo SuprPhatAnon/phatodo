@@ -36,6 +36,7 @@ type Querier interface {
 	GetWorkItemLock(ctx context.Context, arg GetWorkItemLockParams) (WorkItemLock, error)
 	GetWorkspaceIDBySlug(ctx context.Context, slug string) (string, error)
 	HistoryEvents(ctx context.Context, arg HistoryEventsParams) ([]Event, error)
+	HistoryEventsSince(ctx context.Context, arg HistoryEventsSinceParams) ([]Event, error)
 	InsertAdminUser(ctx context.Context, arg InsertAdminUserParams) error
 	InsertBootstrapUser(ctx context.Context, arg InsertBootstrapUserParams) error
 	InsertEvent(ctx context.Context, arg InsertEventParams) error
@@ -52,6 +53,7 @@ type Querier interface {
 	ListWorkItemLocks(ctx context.Context, arg ListWorkItemLocksParams) ([]WorkItemLock, error)
 	LockUsersTable(ctx context.Context) error
 	LookupAdminByUsername(ctx context.Context, username *string) (LookupAdminByUsernameRow, error)
+	LookupUserByAccessKey(ctx context.Context, accessKey string) (User, error)
 	NextEpicCounter(ctx context.Context, projectID string) (int64, error)
 	NextLockCounter(ctx context.Context, projectID string) (int64, error)
 	NextTaskCounter(ctx context.Context, projectID string) (int64, error)

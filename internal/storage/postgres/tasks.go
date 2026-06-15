@@ -161,18 +161,18 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 	}, nil
 }
 
-func (s *Store) ListTasks(ctx context.Context, projectID string, status string, epicID string) (domain.TaskListResponse, error) {
-	return s.listTasks(ctx, projectID, status, epicID, "")
+func (s *Store) ListTasks(ctx context.Context, projectID string, status string, epicID string, limit int) (domain.TaskListResponse, error) {
+	return s.listTasks(ctx, projectID, status, epicID, "", limit)
 }
 
-func (s *Store) ListSubtasks(ctx context.Context, projectID string, parentTaskID string) (domain.TaskListResponse, error) {
+func (s *Store) ListSubtasks(ctx context.Context, projectID string, parentTaskID string, limit int) (domain.TaskListResponse, error) {
 	if _, err := s.readTaskDetail(ctx, projectID, parentTaskID); err != nil {
 		return domain.TaskListResponse{}, err
 	}
-	return s.listTasks(ctx, projectID, "", "", parentTaskID)
+	return s.listTasks(ctx, projectID, "", "", parentTaskID, limit)
 }
 
-func (s *Store) listTasks(ctx context.Context, projectID string, status string, epicID string, parentTaskID string) (domain.TaskListResponse, error) {
+func (s *Store) listTasks(ctx context.Context, projectID string, status string, epicID string, parentTaskID string, limit int) (domain.TaskListResponse, error) {
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.TaskListResponse{}, err
 	}
@@ -208,6 +208,9 @@ func (s *Store) listTasks(ctx context.Context, projectID string, status string, 
 			}
 			items = append(items, item)
 		}
+	}
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
 	}
 
 	return domain.TaskListResponse{
@@ -408,7 +411,7 @@ func (s *Store) DeleteTask(ctx context.Context, projectID string, taskID string,
 	return taskDetailFromSQLC(taskRow)
 }
 
-func (s *Store) ListReadyTasks(ctx context.Context, projectID string, epicID string) (domain.ReadyListResponse, error) {
+func (s *Store) ListReadyTasks(ctx context.Context, projectID string, epicID string, limit int) (domain.ReadyListResponse, error) {
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.ReadyListResponse{}, err
 	}
@@ -424,6 +427,11 @@ func (s *Store) ListReadyTasks(ctx context.Context, projectID string, epicID str
 		item := readyListItemFromSQLC(row)
 		items = append(items, item)
 		readyIDs = append(readyIDs, item.ID)
+	}
+
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+		readyIDs = readyIDs[:limit]
 	}
 
 	if len(readyIDs) == 0 {

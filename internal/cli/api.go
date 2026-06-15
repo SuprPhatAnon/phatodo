@@ -29,7 +29,7 @@ type apiClient interface {
 	SetProjectConfig(context.Context, string, string, string) (ProjectConfigItem, error)
 	UnsetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
 	CreateEpic(context.Context, string, domain.EpicCreateRequest) (domain.Epic, error)
-	ListEpics(context.Context, string, string) (domain.EpicListResponse, error)
+	ListEpics(context.Context, string, string, int) (domain.EpicListResponse, error)
 	GetEpic(context.Context, string, string) (domain.Epic, error)
 	UpdateEpic(context.Context, string, string, domain.EpicUpdateRequest) (domain.Epic, error)
 	CompleteEpic(context.Context, string, string) (domain.Epic, error)
@@ -39,8 +39,8 @@ type apiClient interface {
 	GetTask(context.Context, string, string) (domain.TaskDetail, error)
 	UpdateTask(context.Context, string, string, domain.TaskUpdateRequest) (domain.TaskDetail, error)
 	DeleteTask(context.Context, string, string) (domain.TaskDetail, error)
-	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
-	ListSubtasks(context.Context, string, string) (domain.TaskListResponse, error)
+	ListTasks(context.Context, string, string, string, int) (domain.TaskListResponse, error)
+	ListSubtasks(context.Context, string, string, int) (domain.TaskListResponse, error)
 	ListComments(context.Context, string, string) (domain.CommentListResponse, error)
 	AddComment(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
 	UpdateComment(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
@@ -54,7 +54,7 @@ type apiClient interface {
 	Search(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
 	History(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
 	ListUnified(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
-	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
+	ListReadyTasks(context.Context, string, string, int) (domain.ReadyListResponse, error)
 	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	BootstrapAdmin(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
 }
@@ -166,12 +166,15 @@ func (c *APIClient) CreateEpic(ctx context.Context, projectID string, req domain
 	return payload, nil
 }
 
-func (c *APIClient) ListEpics(ctx context.Context, projectID string, status string) (domain.EpicListResponse, error) {
+func (c *APIClient) ListEpics(ctx context.Context, projectID string, status string, limit int) (domain.EpicListResponse, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "epics")
 	query := endpoint.Query()
 	if status != "" {
 		query.Set("status", status)
+	}
+	if limit > 0 {
+		query.Set("limit", strconv.Itoa(limit))
 	}
 	endpoint.RawQuery = query.Encode()
 
@@ -274,7 +277,7 @@ func (c *APIClient) DeleteTask(ctx context.Context, projectID string, taskID str
 	return payload, nil
 }
 
-func (c *APIClient) ListTasks(ctx context.Context, projectID string, status string, epicID string) (domain.TaskListResponse, error) {
+func (c *APIClient) ListTasks(ctx context.Context, projectID string, status string, epicID string, limit int) (domain.TaskListResponse, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "tasks")
 	query := endpoint.Query()
@@ -283,6 +286,9 @@ func (c *APIClient) ListTasks(ctx context.Context, projectID string, status stri
 	}
 	if epicID != "" {
 		query.Set("epic", epicID)
+	}
+	if limit > 0 {
+		query.Set("limit", strconv.Itoa(limit))
 	}
 	endpoint.RawQuery = query.Encode()
 
@@ -320,10 +326,44 @@ func (c *APIClient) ListTasks(ctx context.Context, projectID string, status stri
 	return payload, nil
 }
 
-func (c *APIClient) ListSubtasks(ctx context.Context, projectID string, taskID string) (domain.TaskListResponse, error) {
+func (c *APIClient) ListSubtasks(ctx context.Context, projectID string, taskID string, limit int) (domain.TaskListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "tasks", url.PathEscape(taskID), "subtasks")
+	query := endpoint.Query()
+	if limit > 0 {
+		query.Set("limit", strconv.Itoa(limit))
+	}
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("call api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		message := resp.Status
+		if msg, ok := body["message"].(string); ok && msg != "" {
+			message = msg
+		}
+		if code, ok := body["error"].(string); ok && code != "" {
+			return domain.TaskListResponse{}, fmt.Errorf("%s: %s", code, message)
+		}
+		return domain.TaskListResponse{}, fmt.Errorf("list subtasks failed: %s", message)
+	}
+
 	var payload domain.TaskListResponse
-	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/subtasks", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
-		return domain.TaskListResponse{}, err
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("decode subtask list response: %w", err)
 	}
 	return payload, nil
 }
@@ -501,12 +541,15 @@ func (c *APIClient) ListUnified(ctx context.Context, projectID string, entityTyp
 	return payload, nil
 }
 
-func (c *APIClient) ListReadyTasks(ctx context.Context, projectID string, epicID string) (domain.ReadyListResponse, error) {
+func (c *APIClient) ListReadyTasks(ctx context.Context, projectID string, epicID string, limit int) (domain.ReadyListResponse, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "ready")
 	query := endpoint.Query()
 	if epicID != "" {
 		query.Set("epic", epicID)
+	}
+	if limit > 0 {
+		query.Set("limit", strconv.Itoa(limit))
 	}
 	endpoint.RawQuery = query.Encode()
 

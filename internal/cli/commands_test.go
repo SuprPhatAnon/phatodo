@@ -21,7 +21,7 @@ type fakeAPIClient struct {
 	setProjectConfigFn   func(context.Context, string, string, string) (ProjectConfigItem, error)
 	unsetProjectConfigFn func(context.Context, string, string) (ProjectConfigItem, error)
 	createEpicFn         func(context.Context, string, domain.EpicCreateRequest) (domain.Epic, error)
-	listEpicsFn          func(context.Context, string, string) (domain.EpicListResponse, error)
+	listEpicsFn          func(context.Context, string, string, int) (domain.EpicListResponse, error)
 	getEpicFn            func(context.Context, string, string) (domain.Epic, error)
 	updateEpicFn         func(context.Context, string, string, domain.EpicUpdateRequest) (domain.Epic, error)
 	completeEpicFn       func(context.Context, string, string) (domain.Epic, error)
@@ -31,8 +31,8 @@ type fakeAPIClient struct {
 	getTaskFn            func(context.Context, string, string) (domain.TaskDetail, error)
 	updateTaskFn         func(context.Context, string, string, domain.TaskUpdateRequest) (domain.TaskDetail, error)
 	deleteTaskFn         func(context.Context, string, string) (domain.TaskDetail, error)
-	listTasksFn          func(context.Context, string, string, string) (domain.TaskListResponse, error)
-	listSubtasksFn       func(context.Context, string, string) (domain.TaskListResponse, error)
+	listTasksFn          func(context.Context, string, string, string, int) (domain.TaskListResponse, error)
+	listSubtasksFn       func(context.Context, string, string, int) (domain.TaskListResponse, error)
 	listCommentsFn       func(context.Context, string, string) (domain.CommentListResponse, error)
 	addCommentFn         func(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
 	updateCommentFn      func(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
@@ -46,7 +46,7 @@ type fakeAPIClient struct {
 	searchFn             func(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
 	historyFn            func(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
 	listUnifiedFn        func(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
-	listReadyTasksFn     func(context.Context, string, string) (domain.ReadyListResponse, error)
+	listReadyTasksFn     func(context.Context, string, string, int) (domain.ReadyListResponse, error)
 	initAdminFn          func(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	bootstrapAdminFn     func(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
 }
@@ -74,11 +74,11 @@ func (f *fakeAPIClient) CreateEpic(ctx context.Context, projectID string, req do
 	return f.createEpicFn(ctx, projectID, req)
 }
 
-func (f *fakeAPIClient) ListEpics(ctx context.Context, projectID, status string) (domain.EpicListResponse, error) {
+func (f *fakeAPIClient) ListEpics(ctx context.Context, projectID, status string, limit int) (domain.EpicListResponse, error) {
 	if f.listEpicsFn == nil {
 		return domain.EpicListResponse{}, nil
 	}
-	return f.listEpicsFn(ctx, projectID, status)
+	return f.listEpicsFn(ctx, projectID, status, limit)
 }
 
 func (f *fakeAPIClient) GetEpic(ctx context.Context, projectID, epicID string) (domain.Epic, error) {
@@ -129,12 +129,12 @@ func (f *fakeAPIClient) DeleteTask(ctx context.Context, projectID, taskID string
 	return f.deleteTaskFn(ctx, projectID, taskID)
 }
 
-func (f *fakeAPIClient) ListTasks(ctx context.Context, projectID, status, epicID string) (domain.TaskListResponse, error) {
-	return f.listTasksFn(ctx, projectID, status, epicID)
+func (f *fakeAPIClient) ListTasks(ctx context.Context, projectID, status, epicID string, limit int) (domain.TaskListResponse, error) {
+	return f.listTasksFn(ctx, projectID, status, epicID, limit)
 }
 
-func (f *fakeAPIClient) ListSubtasks(ctx context.Context, projectID, taskID string) (domain.TaskListResponse, error) {
-	return f.listSubtasksFn(ctx, projectID, taskID)
+func (f *fakeAPIClient) ListSubtasks(ctx context.Context, projectID, taskID string, limit int) (domain.TaskListResponse, error) {
+	return f.listSubtasksFn(ctx, projectID, taskID, limit)
 }
 
 func (f *fakeAPIClient) ListComments(ctx context.Context, projectID, taskID string) (domain.CommentListResponse, error) {
@@ -198,8 +198,8 @@ func (f *fakeAPIClient) ListUnified(ctx context.Context, projectID, entityType, 
 	return f.listUnifiedFn(ctx, projectID, entityType, status, priority, sortSpec, limit)
 }
 
-func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
-	return f.listReadyTasksFn(ctx, projectID, epicID)
+func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string, limit int) (domain.ReadyListResponse, error) {
+	return f.listReadyTasksFn(ctx, projectID, epicID, limit)
 }
 
 func (f *fakeAPIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
@@ -226,10 +226,11 @@ func TestRunTaskListCallsServer(t *testing.T) {
 	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
 		require.Equal(t, "default", cfg.ProjectID)
 		return &fakeAPIClient{
-			listTasksFn: func(ctx context.Context, projectID, status, epicID string) (domain.TaskListResponse, error) {
+			listTasksFn: func(ctx context.Context, projectID, status, epicID string, limit int) (domain.TaskListResponse, error) {
 				require.Equal(t, "default", projectID)
 				require.Equal(t, "in_progress", status)
 				require.Equal(t, "epic-1", epicID)
+				require.Equal(t, 20, limit)
 				return domain.TaskListResponse{
 					ProjectID: "default",
 					Items: []domain.TaskListItem{
@@ -257,7 +258,7 @@ func TestRunTaskListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"task", "list", "--status", "in_progress", "--epic", "epic-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "task", "list", "--status", "in_progress", "--epic", "epic-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "tasks[1]:")
 	require.Contains(t, stdout.String(), "- id: ABC-1")
@@ -281,9 +282,10 @@ func TestRunEpicListCallsServer(t *testing.T) {
 	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
 		require.Equal(t, "default", cfg.ProjectID)
 		return &fakeAPIClient{
-			listEpicsFn: func(ctx context.Context, projectID, status string) (domain.EpicListResponse, error) {
+			listEpicsFn: func(ctx context.Context, projectID, status string, limit int) (domain.EpicListResponse, error) {
 				require.Equal(t, "default", projectID)
 				require.Equal(t, "in_progress", status)
+				require.Equal(t, 20, limit)
 				return domain.EpicListResponse{
 					ProjectID: "default",
 					Items: []domain.Epic{
@@ -312,7 +314,7 @@ func TestRunEpicListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"epic", "list", "--status", "in_progress"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "epic", "list", "--status", "in_progress"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "epics[1]:")
 	require.Contains(t, stdout.String(), "- id: EPIC-1")
@@ -365,7 +367,7 @@ func TestRunLockAcquireCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"lock", "acquire", "task", "ABC-1", "--reason", "editing", "--expires", "30m"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "lock", "acquire", "task", "ABC-1", "--reason", "editing", "--expires", "30m"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: LOCK-1")
 	require.Contains(t, stdout.String(), "entityType: task")
@@ -422,7 +424,7 @@ func TestRunLockListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"lock", "list", "--type", "epic,task", "--entity", "EPIC-1", "--active"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "lock", "list", "--type", "epic,task", "--entity", "EPIC-1", "--active"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "locks[1]:")
 	require.Contains(t, stdout.String(), "- id: LOCK-2")
@@ -473,7 +475,7 @@ func TestRunLockReleaseCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"lock", "release", "LOCK-3"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "lock", "release", "LOCK-3"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: LOCK-3")
 	require.Contains(t, stdout.String(), "releasedAt:")
@@ -495,9 +497,10 @@ func TestRunReadyCallsServer(t *testing.T) {
 	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
 		require.Equal(t, "default", cfg.ProjectID)
 		return &fakeAPIClient{
-			listReadyTasksFn: func(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
+			listReadyTasksFn: func(ctx context.Context, projectID, epicID string, limit int) (domain.ReadyListResponse, error) {
 				require.Equal(t, "default", projectID)
 				require.Equal(t, "epic-1", epicID)
+				require.Equal(t, 20, limit)
 				return domain.ReadyListResponse{
 					ProjectID: "default",
 					Items: []domain.ReadyListItem{
@@ -537,6 +540,71 @@ func TestRunReadyCallsServer(t *testing.T) {
 	require.NoError(t, err)
 
 	code := Run([]string{"ready", "--epic", "epic-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "1 ready task(s)")
+	require.Contains(t, stdout.String(), "CORE-1 | P1 | Health endpoints (epic-1) [infra,api]")
+	require.Contains(t, stdout.String(), "  -> unblocks CORE-5 | todo | P1 | Backups [infra]")
+}
+
+func TestRunReadyCallsServerTOON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listReadyTasksFn: func(ctx context.Context, projectID, epicID string, limit int) (domain.ReadyListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "epic-1", epicID)
+				require.Equal(t, 20, limit)
+				return domain.ReadyListResponse{
+					ProjectID: "default",
+					Items: []domain.ReadyListItem{
+						{
+							ID:       "CORE-1",
+							Title:    "Health endpoints",
+							Status:   domain.StatusTodo,
+							Priority: domain.PriorityHigh,
+							EpicID:   "epic-1",
+							Tags:     []string{"infra", "api"},
+							Unblocks: []domain.TaskListItem{
+								{
+									ID:       "CORE-5",
+									Title:    "Backups",
+									Status:   domain.StatusTodo,
+									Priority: domain.PriorityHigh,
+									EpicID:   "epic-1",
+									Tags:     []string{"infra"},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "ready", "--epic", "epic-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "ready[1]:")
 	require.Contains(t, stdout.String(), "- id: CORE-1")
@@ -594,7 +662,7 @@ func TestRunSearchCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"search", "auth bug", "--type", "task", "--status", "todo", "--limit", "10"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "search", "auth bug", "--type", "task", "--status", "todo", "--limit", "10"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "search[1]:")
 	require.Contains(t, stdout.String(), "- id: ABC-1")
@@ -652,7 +720,7 @@ func TestRunHistoryCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"history", "--entity", "ABC-1", "--type", "task", "--action", "update", "--since", "2025-01-01", "--limit", "5"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "history", "--entity", "ABC-1", "--type", "task", "--action", "update", "--since", "2025-01-01", "--limit", "5"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "history[1]:")
 	require.Contains(t, stdout.String(), "- id: 42")
@@ -710,7 +778,7 @@ func TestRunListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"list", "--type", "epic,task", "--status", "todo", "--priority", "0,1", "--sort", "priority:asc,created:desc", "--limit", "2"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "list", "--type", "epic,task", "--status", "todo", "--priority", "0,1", "--sort", "priority:asc,created:desc", "--limit", "2"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "list[1]:")
 	require.Contains(t, stdout.String(), "- id: EPIC-1")
@@ -739,7 +807,7 @@ func TestRunInitWritesLocalConfig(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d: %s", code, stderr.String())
 	}
-	require.Contains(t, stdout.String(), "- config_path:")
+	require.Contains(t, stdout.String(), "config_path:")
 	require.Contains(t, stdout.String(), "project_id: default")
 
 	configPath := filepath.Join(workdir, ".phatodo", "config.json")
@@ -799,7 +867,7 @@ func TestRunConfigListFetchesProjectConfig(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "list"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "config", "list"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- theme: dark")
 }
@@ -839,7 +907,7 @@ func TestRunConfigSetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "set", "theme", "dark"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "config", "set", "theme", "dark"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- theme: dark")
 }
@@ -878,7 +946,7 @@ func TestRunConfigGetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "get", "theme"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "config", "get", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- theme: dark")
 }
@@ -917,7 +985,7 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "unset", "theme"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "config", "unset", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- theme: dark")
 }
@@ -966,7 +1034,7 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--tags", "dark"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--tags", "dark"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "issue_prefix: ABC")
@@ -1018,7 +1086,7 @@ func TestRunSubtaskCreateCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"subtask", "create", "ABC-1", "-t", "Write docs", "--criteria-json", `["important"]`}, &stdout, &stderr)
+	code := Run([]string{"--toon", "subtask", "create", "ABC-1", "-t", "Write docs", "--criteria-json", `["important"]`}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-2")
 	require.Contains(t, stdout.String(), "issue_prefix: ABC")
@@ -1066,7 +1134,7 @@ func TestRunTaskShowUsesFakeClient(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"task", "show", "ABC-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "task", "show", "ABC-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "epicId: epic-1")
@@ -1088,9 +1156,10 @@ func TestRunSubtaskListCallsServer(t *testing.T) {
 	oldFactory := newAPIClient
 	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
 		return &fakeAPIClient{
-			listSubtasksFn: func(ctx context.Context, projectID, taskID string) (domain.TaskListResponse, error) {
+			listSubtasksFn: func(ctx context.Context, projectID, taskID string, limit int) (domain.TaskListResponse, error) {
 				require.Equal(t, "default", projectID)
 				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, 20, limit)
 				return domain.TaskListResponse{
 					ProjectID: "default",
 					Items: []domain.TaskListItem{
@@ -1118,7 +1187,7 @@ func TestRunSubtaskListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"subtask", "list", "ABC-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "subtask", "list", "ABC-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "subtasks[1]:")
 	require.Contains(t, stdout.String(), "- id: ABC-2")
@@ -1167,7 +1236,7 @@ func TestRunTaskUpdateUsesFakeClient(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"task", "update", "ABC-1", "-t", "Updated docs", "-s", "in_progress"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "task", "update", "ABC-1", "-t", "Updated docs", "-s", "in_progress"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "title: \"Updated docs\"")
@@ -1215,7 +1284,7 @@ func TestRunSubtaskUpdateUsesFakeClient(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"subtask", "update", "ABC-2", "-t", "Updated subtask", "-s", "completed"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "subtask", "update", "ABC-2", "-t", "Updated subtask", "-s", "completed"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-2")
 	require.Contains(t, stdout.String(), "title: \"Updated subtask\"")
@@ -1260,7 +1329,7 @@ func TestRunTaskDeleteUsesFakeClient(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"task", "delete", "ABC-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "task", "delete", "ABC-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "status: archived")
@@ -1304,7 +1373,7 @@ func TestRunSubtaskDeleteUsesFakeClient(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"subtask", "delete", "ABC-2"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "subtask", "delete", "ABC-2"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-2")
 	require.Contains(t, stdout.String(), "status: archived")
@@ -1352,7 +1421,7 @@ func TestRunCommentAddCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"comment", "add", "ABC-1", "-a", "agent", "-c", "Done", "-k", "summary"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "comment", "add", "ABC-1", "-a", "agent", "-c", "Done", "-k", "summary"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: cmt-1")
 	require.Contains(t, stdout.String(), "author: agent")
@@ -1405,7 +1474,7 @@ func TestRunCommentListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"comment", "list", "ABC-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "comment", "list", "ABC-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "comments[1]:")
 	require.Contains(t, stdout.String(), "- id: cmt-1")
@@ -1452,7 +1521,7 @@ func TestRunCommentUpdateCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"comment", "update", "cmt-1", "-c", "Updated"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "comment", "update", "cmt-1", "-c", "Updated"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: cmt-1")
 	require.Contains(t, stdout.String(), "content: Updated")
@@ -1497,7 +1566,7 @@ func TestRunCommentDeleteCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"comment", "delete", "cmt-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "comment", "delete", "cmt-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: cmt-1")
 	require.Contains(t, stdout.String(), "content: Deleted")
@@ -1542,7 +1611,7 @@ func TestRunDepAddCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"dep", "add", "ABC-1", "ABC-2"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "dep", "add", "ABC-1", "ABC-2"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: dep-1")
 	require.Contains(t, stdout.String(), "taskId: ABC-1")
@@ -1589,7 +1658,7 @@ func TestRunDepListCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"dep", "list", "ABC-1"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "dep", "list", "ABC-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "dependencies[1]:")
 	require.Contains(t, stdout.String(), "taskId: ABC-1")
@@ -1635,7 +1704,7 @@ func TestRunDepRemoveCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"dep", "remove", "ABC-1", "ABC-2"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "dep", "remove", "ABC-1", "ABC-2"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: dep-1")
 	require.Contains(t, stdout.String(), "taskId: ABC-1")
@@ -1669,7 +1738,7 @@ func TestRunAdminInitCallsServer(t *testing.T) {
 	}
 	t.Cleanup(func() { newAPIClient = oldFactory })
 
-	code := Run([]string{"admin", "init", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "admin", "init", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Equal(t, "alice", got.Username)
 	require.Equal(t, "secret", got.Password)
@@ -1711,7 +1780,7 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	}
 	t.Cleanup(func() { newAPIClient = oldFactory })
 
-	code := Run([]string{"admin", "bootstrap", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
+	code := Run([]string{"--toon", "admin", "bootstrap", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Equal(t, "alice", got.Username)
 	require.Equal(t, "secret", got.Password)
@@ -1724,4 +1793,38 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	require.Contains(t, stdout.String(), "- workspace_id: ws_1")
 	require.Contains(t, stdout.String(), "project_id: prj_1")
 	require.Contains(t, stdout.String(), "config_path:")
+}
+
+func TestRunAdminBootstrapStopsWhenConfigExists(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	_, err = config.WriteLocal(workdir, config.DefaultLocalConfig())
+	require.NoError(t, err)
+
+	oldPrompt := readPasswordPrompt
+	readPasswordPrompt = func(prompt string, _ io.Writer) (string, error) {
+		t.Fatalf("password prompt should not be reached when config exists")
+		return "", nil
+	}
+	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		t.Fatalf("api client should not be created when config exists")
+		return nil, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	code := Run([]string{"--toon", "admin", "bootstrap", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
+	require.Equal(t, 1, code)
+	require.Contains(t, stderr.String(), "local config already exists:")
 }

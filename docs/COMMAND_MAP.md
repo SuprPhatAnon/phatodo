@@ -59,7 +59,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
 | `ptodo epic create` | `POST /api/v1/projects/{projectID}/epics` | `epics` | `events`, `search_index`, `id_counters` if ID generation is server-side. |
-| `ptodo epic list` | `GET /api/v1/projects/{projectID}/epics` | `epics` | May read `search_index` for filtering/sorting. |
+| `ptodo epic list` | `GET /api/v1/projects/{projectID}/epics` | `epics` | May read `search_index` for filtering/sorting; accepts `limit` and defaults to `20`. |
 | `ptodo epic show` | `GET /api/v1/projects/{projectID}/epics/{epicID}` | `epics` | None. |
 | `ptodo epic update` | `PATCH /api/v1/projects/{projectID}/epics/{epicID}` | `epics` | `events`, `search_index`. |
 | `ptodo epic complete` | `POST /api/v1/projects/{projectID}/epics/{epicID}/complete` | `epics`, `tasks` | `events`, `search_index`; archives child tasks as part of the operation. |
@@ -70,7 +70,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
 | `ptodo task create` | `POST /api/v1/projects/{projectID}/tasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side; `issue_prefix` must be supplied in the create payload. |
-| `ptodo task list` | `GET /api/v1/projects/{projectID}/tasks` | `tasks` | None. Returns top-level tasks unless a subtask-specific command is used. |
+| `ptodo task list` | `GET /api/v1/projects/{projectID}/tasks` | `tasks` | None. Returns top-level tasks unless a subtask-specific command is used; accepts `limit` and defaults to `20`. |
 | `ptodo task show` | `GET /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | None. |
 | `ptodo task update` | `PATCH /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | `events`, `search_index`. |
 | `ptodo task delete` | `DELETE /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | `comments`, `dependencies`, `events`, `search_index`, and any active `work_item_locks` cleanup. |
@@ -80,7 +80,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
 | `ptodo subtask create` | `POST /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side; the server derives the subtask issue prefix from the parent task. |
-| `ptodo subtask list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | None. Returns direct child subtasks for the parent task. |
+| `ptodo subtask list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | None. Returns direct child subtasks for the parent task; accepts `limit` and defaults to `20`. |
 | `ptodo subtask update` | `PATCH /api/v1/projects/{projectID}/tasks/{subtaskID}` | `tasks` | `events`, `search_index`. |
 | `ptodo subtask delete` | `DELETE /api/v1/projects/{projectID}/tasks/{subtaskID}` | `tasks` | `comments`, `dependencies`, `events`, `search_index`, and any active `work_item_locks` cleanup. |
 

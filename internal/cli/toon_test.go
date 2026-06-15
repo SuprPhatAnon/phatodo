@@ -9,6 +9,8 @@ import (
 )
 
 func TestWriteProjectConfigItemTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeProjectConfigItem(&buf, ProjectConfigItem{Key: "theme", Value: "dark"})
@@ -16,7 +18,19 @@ func TestWriteProjectConfigItemTOON(t *testing.T) {
 	require.Equal(t, "- theme: dark\n", buf.String())
 }
 
+func TestWriteProjectConfigItemHuman(t *testing.T) {
+	setOutputMode(false)
+	t.Cleanup(func() { setOutputMode(false) })
+	var buf bytes.Buffer
+
+	writeProjectConfigItem(&buf, ProjectConfigItem{Key: "theme", Value: "dark"})
+
+	require.Equal(t, "theme: dark\n", buf.String())
+}
+
 func TestWriteTaskCreateResponseTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeTaskCreateResponse(&buf, domain.TaskCreateResponse{
@@ -32,7 +46,27 @@ func TestWriteTaskCreateResponseTOON(t *testing.T) {
 	require.Equal(t, "- id: ABC-1\n  issue_prefix: ABC\n  title: \"Write docs\"\n  status: todo\n  priority: 2\n  project_id: default\n  workspace_id: workspace-1\n", buf.String())
 }
 
+func TestWriteTaskCreateResponseHuman(t *testing.T) {
+	setOutputMode(false)
+	t.Cleanup(func() { setOutputMode(false) })
+	var buf bytes.Buffer
+
+	writeTaskCreateResponse(&buf, domain.TaskCreateResponse{
+		ID:          "ABC-1",
+		IssuePrefix: "ABC",
+		Title:       "Write docs",
+		Status:      domain.StatusTodo,
+		Priority:    domain.PriorityMedium,
+		ProjectID:   "default",
+		WorkspaceID: "workspace-1",
+	})
+
+	require.Equal(t, "id: ABC-1\n  issue_prefix: ABC\n  title: Write docs\n  status: todo\n  priority: 2\n  project_id: default\n  workspace_id: workspace-1\n", buf.String())
+}
+
 func TestWriteTaskListItemTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeTaskListItem(&buf, 0, domain.TaskListItem{
@@ -48,6 +82,8 @@ func TestWriteTaskListItemTOON(t *testing.T) {
 }
 
 func TestWriteReadyListItemTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeReadyListItem(&buf, 0, domain.ReadyListItem{
@@ -74,6 +110,8 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 }
 
 func TestWriteCommentTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeComment(&buf, 0, domain.Comment{
@@ -87,6 +125,8 @@ func TestWriteCommentTOON(t *testing.T) {
 }
 
 func TestWriteDependencyTOON(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
 	var buf bytes.Buffer
 
 	writeDependency(&buf, 0, domain.Dependency{

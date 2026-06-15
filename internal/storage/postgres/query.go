@@ -151,27 +151,35 @@ func (s *Store) History(ctx context.Context, projectID string, entityID string, 
 		return domain.HistoryResponse{}, err
 	}
 
-	var sinceValue any
-	if since != "" {
-		sinceTime, err := parseFlexibleTime(since)
-		if err != nil {
-			return domain.HistoryResponse{}, err
-		}
-		sinceValue = sinceTime
-	}
-	queryLimit := int32(limit)
+	queryLimit := int64(limit)
 	if queryLimit <= 0 {
 		queryLimit = 2147483647
 	}
 
-	rows, err := s.q.HistoryEvents(ctx, db.HistoryEventsParams{
-		ProjectID:  projectID,
-		EntityID:   entityID,
-		EntityType: entityType,
-		Action:     action,
-		Since:      sinceValue,
-		QueryLimit: queryLimit,
-	})
+	var rows []db.Event
+	var err error
+	if since == "" {
+		rows, err = s.q.HistoryEvents(ctx, db.HistoryEventsParams{
+			ProjectID:  projectID,
+			EntityID:   entityID,
+			EntityType: entityType,
+			Action:     action,
+			QueryLimit: queryLimit,
+		})
+	} else {
+		sinceTime, parseErr := parseFlexibleTime(since)
+		if parseErr != nil {
+			return domain.HistoryResponse{}, parseErr
+		}
+		rows, err = s.q.HistoryEventsSince(ctx, db.HistoryEventsSinceParams{
+			ProjectID:  projectID,
+			EntityID:   entityID,
+			EntityType: entityType,
+			Action:     action,
+			Since:      sinceTime,
+			QueryLimit: queryLimit,
+		})
+	}
 	if err != nil {
 		return domain.HistoryResponse{}, fmt.Errorf("query history: %w", err)
 	}

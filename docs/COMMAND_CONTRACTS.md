@@ -142,6 +142,7 @@ Expected body fields:
 
 Optional filters:
 - `--status`
+- `--limit <n>` defaults to `20`
 
 Server request:
 - `GET /api/v1/projects/{projectID}/epics`
@@ -233,6 +234,7 @@ Response:
 Optional filters:
 - `--status <status>`
 - `--epic <epic-id>`
+- `--limit <n>` defaults to `20`
 
 Server request:
 - `GET /api/v1/projects/{projectID}/tasks`
@@ -305,6 +307,9 @@ Server request:
 
 Required input:
 - `<task-id>`
+
+Optional filters:
+- `--limit <n>` defaults to `20`
 
 Server request:
 - `GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks`

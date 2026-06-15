@@ -21,6 +21,12 @@ FROM users
 WHERE username = sqlc.arg(username) AND role = 'admin'
 LIMIT 1;
 
+-- name: LookupUserByAccessKey :one
+SELECT id, display_name, role, access_key, access_secret_hash, username, password_hash, disabled_at, last_seen_at, created_at, updated_at
+FROM users
+WHERE access_key = sqlc.arg(access_key)
+LIMIT 1;
+
 -- name: CreateWorkspace :one
 INSERT INTO workspaces (id, name, slug)
 VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(slug))

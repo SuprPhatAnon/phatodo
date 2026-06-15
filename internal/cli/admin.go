@@ -73,6 +73,15 @@ func runAdminBootstrap(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
+	configPath := config.LocalPath(workdir)
+	if _, err := os.Stat(configPath); err == nil {
+		fmt.Fprintf(stderr, "local config already exists: %s\n", configPath)
+		return 1
+	} else if !os.IsNotExist(err) {
+		fmt.Fprintf(stderr, "failed to check local config: %v\n", err)
+		return 1
+	}
+
 	projectName := opts.projectName
 	if projectName == "" {
 		projectName = repoBaseName(workdir)

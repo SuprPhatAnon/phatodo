@@ -10,6 +10,7 @@ import (
 type Config struct {
 	Addr                string
 	PostgresDSN         string
+	AuthResolver        AuthResolver
 	ProjectConfigReader ProjectConfigReader
 	ProjectConfigWriter ProjectConfigWriter
 	EpicLister          EpicLister
@@ -51,8 +52,12 @@ type ProjectConfigWriter interface {
 	DeleteProjectConfig(context.Context, string, string) (domain.ProjectConfig, error)
 }
 
+type AuthResolver interface {
+	ResolveAPIPrincipal(context.Context, string, string) (domain.User, error)
+}
+
 type EpicLister interface {
-	ListEpics(context.Context, string, string) (domain.EpicListResponse, error)
+	ListEpics(context.Context, string, string, int) (domain.EpicListResponse, error)
 }
 
 type EpicReader interface {
@@ -80,11 +85,11 @@ type TaskCreator interface {
 }
 
 type TaskLister interface {
-	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
+	ListTasks(context.Context, string, string, string, int) (domain.TaskListResponse, error)
 }
 
 type SubtaskLister interface {
-	ListSubtasks(context.Context, string, string) (domain.TaskListResponse, error)
+	ListSubtasks(context.Context, string, string, int) (domain.TaskListResponse, error)
 }
 
 type TaskReader interface {
@@ -140,7 +145,7 @@ type ListLister interface {
 }
 
 type ReadyLister interface {
-	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
+	ListReadyTasks(context.Context, string, string, int) (domain.ReadyListResponse, error)
 }
 
 type BootstrapManager interface {

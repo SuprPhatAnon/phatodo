@@ -7,6 +7,7 @@ This document defines the user-facing output contract for the `ptodo` command.
 ### Default mode
 
 Default mode should be human-readable and suitable for direct terminal use.
+The examples in this document use the compact TOON rendering for brevity unless explicitly noted otherwise.
 
 ### `--toon`
 
@@ -74,7 +75,7 @@ Render:
   title: "Write docs"
 ```
 
-`ptodo task list --status in_progress --epic epic-1`:
+`ptodo task list --status in_progress --epic epic-1 --limit 20`:
 
 ```text
 tasks[1]:
@@ -84,6 +85,21 @@ tasks[1]:
     priority: 2
     status: in_progress
     epicId: epic-1
+```
+
+`ptodo epic list --status in_progress --limit 20`:
+
+```text
+epics[1]:
+  - id: EPIC-1
+    title: "Track auth"
+    description: "Add end-to-end auth checks across the CLI and API."
+    priority: 0
+    status: in_progress
+    assignedTo: bryan
+    acceptanceCriteria[2]:
+      - "CLI commands require project config"
+      - "API routes reject missing credentials"
 ```
 
 `ptodo epic show EPIC-1`:
@@ -98,6 +114,18 @@ tasks[1]:
   acceptanceCriteria[2]:
     - "CLI commands require project config"
     - "API routes reject missing credentials"
+```
+
+`ptodo subtask list ABC-1 --limit 20`:
+
+```text
+subtasks[1]:
+  - id: ABC-2
+    title: "Write docs"
+    description: ""
+    priority: 2
+    status: todo
+    parentTaskId: ABC-1
 ```
 
 `ptodo ready --epic epic-1`:

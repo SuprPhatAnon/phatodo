@@ -10,6 +10,23 @@ import (
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
 )
 
+type outputMode int
+
+const (
+	outputHuman outputMode = iota
+	outputTOON
+)
+
+var currentOutputMode = outputHuman
+
+func setOutputMode(toon bool) {
+	if toon {
+		currentOutputMode = outputTOON
+		return
+	}
+	currentOutputMode = outputHuman
+}
+
 func toonIndent(level int) string {
 	return strings.Repeat("  ", level)
 }
@@ -35,10 +52,18 @@ func needsTOONQuotes(value string) bool {
 }
 
 func writeTOONField(w io.Writer, indent int, key string, value string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s: %s\n", toonIndent(indent), key, value)
+		return
+	}
 	fmt.Fprintf(w, "%s%s: %s\n", toonIndent(indent), key, toonScalar(value))
 }
 
 func writeTOONQuotedField(w io.Writer, indent int, key string, value string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s: %s\n", toonIndent(indent), key, value)
+		return
+	}
 	fmt.Fprintf(w, "%s%s: %s\n", toonIndent(indent), key, strconv.Quote(value))
 }
 
@@ -47,14 +72,26 @@ func writeTOONIntField(w io.Writer, indent int, key string, value int) {
 }
 
 func writeTOONArrayHeader(w io.Writer, indent int, key string, count int) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s (%d)\n", toonIndent(indent), key, count)
+		return
+	}
 	fmt.Fprintf(w, "%s%s[%d]:\n", toonIndent(indent), key, count)
 }
 
 func writeTOONArrayHeaderWithFields(w io.Writer, indent int, key string, count int, fields []string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s (%d items: %s)\n", toonIndent(indent), key, count, strings.Join(fields, ", "))
+		return
+	}
 	fmt.Fprintf(w, "%s%s[%d]{%s}:\n", toonIndent(indent), key, count, strings.Join(fields, ","))
 }
 
 func writeTOONListItemStart(w io.Writer, indent int, key string, value string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s: %s\n", toonIndent(indent), key, value)
+		return
+	}
 	fmt.Fprintf(w, "%s- %s: %s\n", toonIndent(indent), key, toonScalar(value))
 }
 
@@ -69,6 +106,10 @@ func writeTOONRowValue(value string) string {
 }
 
 func writeTOONRow(w io.Writer, indent int, values ...string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s\n", toonIndent(indent), strings.Join(values, " | "))
+		return
+	}
 	parts := make([]string, len(values))
 	for i, value := range values {
 		parts[i] = writeTOONRowValue(value)
@@ -77,6 +118,13 @@ func writeTOONRow(w io.Writer, indent int, values ...string) {
 }
 
 func writeTOONStringArray(w io.Writer, indent int, key string, values []string) {
+	if currentOutputMode != outputTOON {
+		fmt.Fprintf(w, "%s%s:\n", toonIndent(indent), key)
+		for _, value := range values {
+			fmt.Fprintf(w, "%s- %s\n", toonIndent(indent+1), value)
+		}
+		return
+	}
 	writeTOONArrayHeader(w, indent, key, len(values))
 	for _, value := range values {
 		fmt.Fprintf(w, "%s- %s\n", toonIndent(indent+1), toonScalar(value))
@@ -145,6 +193,31 @@ func writeReadyListItem(w io.Writer, indent int, item domain.ReadyListItem) {
 		for _, blocked := range item.Unblocks {
 			writeTOONRow(w, indent+2, blocked.ID, blocked.Title, string(blocked.Status), strconv.Itoa(int(blocked.Priority)))
 		}
+	}
+}
+
+func writeReadyHumanList(w io.Writer, resp domain.ReadyListResponse) {
+	fmt.Fprintf(w, "%d ready task(s)\n", len(resp.Items))
+	for _, item := range resp.Items {
+		writeReadyHumanItem(w, item, 0)
+	}
+}
+
+func writeReadyHumanItem(w io.Writer, item domain.ReadyListItem, indent int) {
+	fmt.Fprintf(w, "%s%s | P%d | %s", toonIndent(indent), item.ID, int(item.Priority), item.Title)
+	if item.EpicID != "" {
+		fmt.Fprintf(w, " (%s)", item.EpicID)
+	}
+	if len(item.Tags) > 0 {
+		fmt.Fprintf(w, " [%s]", strings.Join(item.Tags, ","))
+	}
+	fmt.Fprintln(w)
+	for _, blocked := range item.Unblocks {
+		fmt.Fprintf(w, "%s-> unblocks %s | %s | P%d | %s", toonIndent(indent+1), blocked.ID, blocked.Status, int(blocked.Priority), blocked.Title)
+		if len(blocked.Tags) > 0 {
+			fmt.Fprintf(w, " [%s]", strings.Join(blocked.Tags, ","))
+		}
+		fmt.Fprintln(w)
 	}
 }
 

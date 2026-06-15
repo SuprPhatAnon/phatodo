@@ -17,9 +17,8 @@ WHERE project_id = $1
   AND ($2 = '' OR entity_id = $2)
   AND ($3 = '' OR entity_type = $3)
   AND ($4 = '' OR action = $4)
-  AND ($5 IS NULL OR created_at >= $5)
 ORDER BY created_at DESC, id DESC
-LIMIT $6
+LIMIT $5::bigint
 `
 
 type HistoryEventsParams struct {
@@ -27,12 +26,71 @@ type HistoryEventsParams struct {
 	EntityID   interface{} `json:"entity_id"`
 	EntityType interface{} `json:"entity_type"`
 	Action     interface{} `json:"action"`
-	Since      interface{} `json:"since"`
-	QueryLimit int32       `json:"query_limit"`
+	QueryLimit int64       `json:"query_limit"`
 }
 
 func (q *Queries) HistoryEvents(ctx context.Context, arg HistoryEventsParams) ([]Event, error) {
 	rows, err := q.db.Query(ctx, historyEvents,
+		arg.ProjectID,
+		arg.EntityID,
+		arg.EntityType,
+		arg.Action,
+		arg.QueryLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Event{}
+	for rows.Next() {
+		var i Event
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.ProjectID,
+			&i.Action,
+			&i.EntityType,
+			&i.EntityID,
+			&i.ActorUserID,
+			&i.ActorLabel,
+			&i.BeforeState,
+			&i.AfterState,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyEventsSince = `-- name: HistoryEventsSince :many
+SELECT id, workspace_id, project_id, action, entity_type, entity_id, actor_user_id, actor_label, before_state, after_state, metadata, created_at
+FROM events
+WHERE project_id = $1
+  AND ($2 = '' OR entity_id = $2)
+  AND ($3 = '' OR entity_type = $3)
+  AND ($4 = '' OR action = $4)
+  AND created_at >= $5
+ORDER BY created_at DESC, id DESC
+LIMIT $6::bigint
+`
+
+type HistoryEventsSinceParams struct {
+	ProjectID  string      `json:"project_id"`
+	EntityID   interface{} `json:"entity_id"`
+	EntityType interface{} `json:"entity_type"`
+	Action     interface{} `json:"action"`
+	Since      time.Time   `json:"since"`
+	QueryLimit int64       `json:"query_limit"`
+}
+
+func (q *Queries) HistoryEventsSince(ctx context.Context, arg HistoryEventsSinceParams) ([]Event, error) {
+	rows, err := q.db.Query(ctx, historyEventsSince,
 		arg.ProjectID,
 		arg.EntityID,
 		arg.EntityType,

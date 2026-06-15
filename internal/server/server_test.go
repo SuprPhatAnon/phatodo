@@ -199,6 +199,15 @@ func (f fakeBootstrapManager) BootstrapProject(_ context.Context, _ domain.Admin
 	return f.bootstrapResponse, f.bootstrapErr
 }
 
+type fakeAuthResolver struct {
+	user domain.User
+	err  error
+}
+
+func (f fakeAuthResolver) ResolveAPIPrincipal(_ context.Context, _ string, _ string) (domain.User, error) {
+	return f.user, f.err
+}
+
 type fakeTaskCreator struct {
 	createResponse domain.TaskCreateResponse
 	createErr      error
@@ -213,7 +222,7 @@ type fakeSubtaskLister struct {
 	listErr      error
 }
 
-func (f fakeSubtaskLister) ListSubtasks(_ context.Context, _ string, _ string) (domain.TaskListResponse, error) {
+func (f fakeSubtaskLister) ListSubtasks(_ context.Context, _ string, _ string, _ int) (domain.TaskListResponse, error) {
 	return f.listResponse, f.listErr
 }
 
@@ -222,7 +231,7 @@ type fakeTaskLister struct {
 	listErr      error
 }
 
-func (f fakeTaskLister) ListTasks(_ context.Context, _ string, _ string, _ string) (domain.TaskListResponse, error) {
+func (f fakeTaskLister) ListTasks(_ context.Context, _ string, _ string, _ string, _ int) (domain.TaskListResponse, error) {
 	return f.listResponse, f.listErr
 }
 
@@ -348,7 +357,7 @@ type fakeReadyLister struct {
 	listErr      error
 }
 
-func (f fakeReadyLister) ListReadyTasks(_ context.Context, _ string, _ string) (domain.ReadyListResponse, error) {
+func (f fakeReadyLister) ListReadyTasks(_ context.Context, _ string, _ string, _ int) (domain.ReadyListResponse, error) {
 	return f.listResponse, f.listErr
 }
 
@@ -482,24 +491,32 @@ func TestTaskDeleteReturnsDetail(t *testing.T) {
 }
 
 func TestTaskCreateReturnsTask(t *testing.T) {
+	creator := &recordingTaskCreator{
+		createResponse: domain.TaskCreateResponse{
+			ID:          "ABC-1",
+			IssuePrefix: "ABC",
+			Title:       "Write docs",
+			Status:      domain.StatusTodo,
+			Priority:    domain.PriorityMedium,
+			ProjectID:   "project-1",
+			WorkspaceID: "workspace-1",
+		},
+	}
 	handler := newApp(Config{
-		TaskCreator: fakeTaskCreator{
-			createResponse: domain.TaskCreateResponse{
-				ID:          "ABC-1",
-				IssuePrefix: "ABC",
-				Title:       "Write docs",
-				Status:      domain.StatusTodo,
-				Priority:    domain.PriorityMedium,
-				ProjectID:   "project-1",
-				WorkspaceID: "workspace-1",
+		AuthResolver: fakeAuthResolver{
+			user: domain.User{
+				ID:          "usr_1",
+				DisplayName: "CLI User",
+				Role:        domain.UserRoleUser,
+				AccessKey:   "key",
 			},
 		},
+		TaskCreator: creator,
 	}).routes()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/tasks", strings.NewReader(`{"title":"Write docs","issue_prefix":"ABC","priority":2,"tags":["docs"]}`))
 	req.Header.Set(AccessKeyHeader, "key")
 	req.Header.Set(AccessSecretHeader, "secret")
-	req.Header.Set(UserIDHeader, "usr_1")
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)
@@ -511,6 +528,18 @@ func TestTaskCreateReturnsTask(t *testing.T) {
 	require.Equal(t, "ABC-1", body["id"])
 	require.Equal(t, "ABC", body["issue_prefix"])
 	require.Equal(t, "Write docs", body["title"])
+	require.Equal(t, "usr_1", creator.actorUserID)
+}
+
+type recordingTaskCreator struct {
+	createResponse domain.TaskCreateResponse
+	createErr      error
+	actorUserID    string
+}
+
+func (f *recordingTaskCreator) CreateTask(_ context.Context, _ string, _ domain.TaskCreateRequest, actorUserID string) (domain.TaskCreateResponse, error) {
+	f.actorUserID = actorUserID
+	return f.createResponse, f.createErr
 }
 
 func TestSearchReturnsItems(t *testing.T) {

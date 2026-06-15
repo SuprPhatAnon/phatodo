@@ -210,3 +210,29 @@ func (q *Queries) LookupAdminByUsername(ctx context.Context, username *string) (
 	)
 	return i, err
 }
+
+const lookupUserByAccessKey = `-- name: LookupUserByAccessKey :one
+SELECT id, display_name, role, access_key, access_secret_hash, username, password_hash, disabled_at, last_seen_at, created_at, updated_at
+FROM users
+WHERE access_key = $1
+LIMIT 1
+`
+
+func (q *Queries) LookupUserByAccessKey(ctx context.Context, accessKey string) (User, error) {
+	row := q.db.QueryRow(ctx, lookupUserByAccessKey, accessKey)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.DisplayName,
+		&i.Role,
+		&i.AccessKey,
+		&i.AccessSecretHash,
+		&i.Username,
+		&i.PasswordHash,
+		&i.DisabledAt,
+		&i.LastSeenAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

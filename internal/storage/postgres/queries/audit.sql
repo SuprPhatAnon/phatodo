@@ -58,6 +58,16 @@ WHERE project_id = sqlc.arg(project_id)
   AND (sqlc.arg(entity_id) = '' OR entity_id = sqlc.arg(entity_id))
   AND (sqlc.arg(entity_type) = '' OR entity_type = sqlc.arg(entity_type))
   AND (sqlc.arg(action) = '' OR action = sqlc.arg(action))
-  AND (sqlc.arg(since) IS NULL OR created_at >= sqlc.arg(since))
 ORDER BY created_at DESC, id DESC
-LIMIT sqlc.arg(query_limit);
+LIMIT sqlc.arg(query_limit)::bigint;
+
+-- name: HistoryEventsSince :many
+SELECT id, workspace_id, project_id, action, entity_type, entity_id, actor_user_id, actor_label, before_state, after_state, metadata, created_at
+FROM events
+WHERE project_id = sqlc.arg(project_id)
+  AND (sqlc.arg(entity_id) = '' OR entity_id = sqlc.arg(entity_id))
+  AND (sqlc.arg(entity_type) = '' OR entity_type = sqlc.arg(entity_type))
+  AND (sqlc.arg(action) = '' OR action = sqlc.arg(action))
+  AND created_at >= sqlc.arg(since)
+ORDER BY created_at DESC, id DESC
+LIMIT sqlc.arg(query_limit)::bigint;

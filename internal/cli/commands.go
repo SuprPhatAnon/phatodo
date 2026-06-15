@@ -34,12 +34,14 @@ var commandGroups = []struct {
 // Run is the CLI boundary. It currently validates the Trekker-compatible
 // command shape while the API client and persistence behavior are built out.
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
+	setOutputMode(false)
 	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
 		printHelp(stdout)
 		return 0
 	}
 
 	if args[0] == "--toon" {
+		setOutputMode(true)
 		args = args[1:]
 	}
 	if len(args) == 0 {
@@ -465,6 +467,7 @@ func parseEpicUpdateArgs(args []string) (epicUpdateOptions, error) {
 
 type epicListOptions struct {
 	status string
+	limit  int
 }
 
 func parseEpicListArgs(args []string) (epicListOptions, error) {
@@ -472,7 +475,9 @@ func parseEpicListArgs(args []string) (epicListOptions, error) {
 	fs.SetOutput(io.Discard)
 
 	var status string
+	var limit int
 	fs.StringVar(&status, "status", "", "")
+	fs.IntVar(&limit, "limit", 20, "")
 
 	if err := fs.Parse(args); err != nil {
 		return epicListOptions{}, fmt.Errorf("invalid epic list flags: %w", err)
@@ -484,7 +489,7 @@ func parseEpicListArgs(args []string) (epicListOptions, error) {
 		return epicListOptions{}, fmt.Errorf("epic list status must be todo, in_progress, completed, or archived")
 	}
 
-	return epicListOptions{status: status}, nil
+	return epicListOptions{status: status, limit: limit}, nil
 }
 
 func runEpicCreate(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -556,7 +561,7 @@ func runEpicList(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	resp, err := client.ListEpics(context.Background(), cfg.ProjectID, opts.status)
+	resp, err := client.ListEpics(context.Background(), cfg.ProjectID, opts.status, opts.limit)
 	if err != nil {
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1
@@ -870,8 +875,9 @@ func runTaskShow(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func runSubtaskList(args []string, stdout io.Writer, stderr io.Writer) int {
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "usage: ptodo subtask list <task-id>")
+	opts, err := parseSubtaskListArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
 		return 2
 	}
 
@@ -893,7 +899,7 @@ func runSubtaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	resp, err := client.ListSubtasks(context.Background(), cfg.ProjectID, args[0])
+	resp, err := client.ListSubtasks(context.Background(), cfg.ProjectID, opts.taskID, opts.limit)
 	if err != nil {
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1
@@ -1591,7 +1597,7 @@ func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	resp, err := client.ListTasks(context.Background(), cfg.ProjectID, opts.status, opts.epicID)
+	resp, err := client.ListTasks(context.Background(), cfg.ProjectID, opts.status, opts.epicID, opts.limit)
 	if err != nil {
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1
@@ -1897,16 +1903,21 @@ func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	resp, err := client.ListReadyTasks(context.Background(), cfg.ProjectID, opts.epicID)
+	resp, err := client.ListReadyTasks(context.Background(), cfg.ProjectID, opts.epicID, opts.limit)
 	if err != nil {
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1
 	}
 
-	writeTOONArrayHeader(stdout, 0, "ready", len(resp.Items))
-	for _, item := range resp.Items {
-		writeReadyListItem(stdout, 1, item)
+	if currentOutputMode == outputTOON {
+		writeTOONArrayHeader(stdout, 0, "ready", len(resp.Items))
+		for _, item := range resp.Items {
+			writeReadyListItem(stdout, 1, item)
+		}
+		return 0
 	}
+
+	writeReadyHumanList(stdout, resp)
 	return 0
 }
 
@@ -2341,6 +2352,7 @@ func printHelp(w io.Writer) {
 type taskListOptions struct {
 	status string
 	epicID string
+	limit  int
 }
 
 func parseTaskListArgs(args []string) (taskListOptions, error) {
@@ -2349,8 +2361,10 @@ func parseTaskListArgs(args []string) (taskListOptions, error) {
 
 	var status string
 	var epicID string
+	var limit int
 	fs.StringVar(&status, "status", "", "")
 	fs.StringVar(&epicID, "epic", "", "")
+	fs.IntVar(&limit, "limit", 20, "")
 
 	if err := fs.Parse(args); err != nil {
 		return taskListOptions{}, fmt.Errorf("invalid task list flags: %w", err)
@@ -2365,11 +2379,40 @@ func parseTaskListArgs(args []string) (taskListOptions, error) {
 	return taskListOptions{
 		status: status,
 		epicID: epicID,
+		limit:  limit,
 	}, nil
+}
+
+type subtaskListOptions struct {
+	taskID string
+	limit  int
+}
+
+func parseSubtaskListArgs(args []string) (subtaskListOptions, error) {
+	fs := flag.NewFlagSet("subtask list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var limit int
+	fs.IntVar(&limit, "limit", 20, "")
+
+	if len(args) == 0 {
+		return subtaskListOptions{}, fmt.Errorf("subtask list requires <task-id>")
+	}
+	taskID := args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return subtaskListOptions{}, fmt.Errorf("invalid subtask list flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return subtaskListOptions{}, fmt.Errorf("subtask list does not accept positional arguments after <task-id>")
+	}
+
+	return subtaskListOptions{taskID: taskID, limit: limit}, nil
 }
 
 type readyOptions struct {
 	epicID string
+	limit  int
 }
 
 func parseReadyArgs(args []string) (readyOptions, error) {
@@ -2377,7 +2420,9 @@ func parseReadyArgs(args []string) (readyOptions, error) {
 	fs.SetOutput(io.Discard)
 
 	var epicID string
+	var limit int
 	fs.StringVar(&epicID, "epic", "", "")
+	fs.IntVar(&limit, "limit", 20, "")
 
 	if err := fs.Parse(args); err != nil {
 		return readyOptions{}, fmt.Errorf("invalid ready flags: %w", err)
@@ -2386,5 +2431,5 @@ func parseReadyArgs(args []string) (readyOptions, error) {
 		return readyOptions{}, fmt.Errorf("ready does not accept positional arguments")
 	}
 
-	return readyOptions{epicID: epicID}, nil
+	return readyOptions{epicID: epicID, limit: limit}, nil
 }

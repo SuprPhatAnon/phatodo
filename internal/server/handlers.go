@@ -67,12 +67,13 @@ func (a *app) listEpics(w http.ResponseWriter, r *http.Request) {
 
 	projectID := r.PathValue("projectID")
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 20)
 	if status != "" && !isAllowedEpicStatus(status) {
 		respondError(w, http.StatusBadRequest, "invalid_status", "status must be todo, in_progress, completed, or archived")
 		return
 	}
 
-	result, err := a.config.EpicLister.ListEpics(r.Context(), projectID, status)
+	result, err := a.config.EpicLister.ListEpics(r.Context(), projectID, status, limit)
 	if err != nil {
 		switch {
 		case errors.Is(err, postgres.ErrProjectNotFound):
@@ -791,8 +792,9 @@ func (a *app) listSubtasks(w http.ResponseWriter, r *http.Request) {
 
 	projectID := r.PathValue("projectID")
 	parentTaskID := r.PathValue("taskID")
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 20)
 
-	result, err := a.config.SubtaskLister.ListSubtasks(r.Context(), projectID, parentTaskID)
+	result, err := a.config.SubtaskLister.ListSubtasks(r.Context(), projectID, parentTaskID, limit)
 	if err != nil {
 		switch {
 		case errors.Is(err, postgres.ErrProjectNotFound):
@@ -880,12 +882,13 @@ func (a *app) listTasks(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("projectID")
 	status := strings.TrimSpace(r.URL.Query().Get("status"))
 	epicID := strings.TrimSpace(r.URL.Query().Get("epic"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 20)
 	if status != "" && !isAllowedTaskStatus(status) {
 		respondError(w, http.StatusBadRequest, "invalid_status", "status must be todo, in_progress, completed, wont_fix, or archived")
 		return
 	}
 
-	result, err := a.config.TaskLister.ListTasks(r.Context(), projectID, status, epicID)
+	result, err := a.config.TaskLister.ListTasks(r.Context(), projectID, status, epicID, limit)
 	if err != nil {
 		switch {
 		case errors.Is(err, postgres.ErrProjectNotFound):
@@ -907,8 +910,9 @@ func (a *app) listReadyTasks(w http.ResponseWriter, r *http.Request) {
 
 	projectID := r.PathValue("projectID")
 	epicID := strings.TrimSpace(r.URL.Query().Get("epic"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 20)
 
-	result, err := a.config.ReadyLister.ListReadyTasks(r.Context(), projectID, epicID)
+	result, err := a.config.ReadyLister.ListReadyTasks(r.Context(), projectID, epicID, limit)
 	if err != nil {
 		switch {
 		case errors.Is(err, postgres.ErrProjectNotFound):

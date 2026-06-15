@@ -14,9 +14,10 @@ const (
 )
 
 type principal struct {
-	UserID    string
-	Role      domain.UserRole
-	AccessKey string
+	UserID      string
+	DisplayName string
+	Role        domain.UserRole
+	AccessKey   string
 }
 
 type principalContextKey struct{}
@@ -30,16 +31,29 @@ func (a *app) withAPIAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		userID := r.Header.Get(UserIDHeader)
-		if userID == "" {
-			userID = accessKey
+		principal := principal{
+			AccessKey: accessKey,
+			Role:      domain.UserRoleUser,
+		}
+		if a.config.AuthResolver != nil {
+			user, err := a.config.AuthResolver.ResolveAPIPrincipal(r.Context(), accessKey, accessSecret)
+			if err != nil {
+				respondError(w, http.StatusUnauthorized, "invalid_credentials", "access key or access secret is invalid")
+				return
+			}
+			principal.UserID = user.ID
+			principal.DisplayName = user.DisplayName
+			principal.Role = user.Role
+			principal.AccessKey = user.AccessKey
+		} else {
+			userID := r.Header.Get(UserIDHeader)
+			if userID == "" {
+				userID = accessKey
+			}
+			principal.UserID = userID
 		}
 
-		ctx := context.WithValue(r.Context(), principalContextKey{}, principal{
-			UserID:    userID,
-			Role:      domain.UserRoleUser,
-			AccessKey: accessKey,
-		})
+		ctx := context.WithValue(r.Context(), principalContextKey{}, principal)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

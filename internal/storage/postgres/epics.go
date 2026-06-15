@@ -90,7 +90,7 @@ func (s *Store) CreateEpic(ctx context.Context, projectID string, req domain.Epi
 	return epic, nil
 }
 
-func (s *Store) ListEpics(ctx context.Context, projectID string, status string) (domain.EpicListResponse, error) {
+func (s *Store) ListEpics(ctx context.Context, projectID string, status string, limit int) (domain.EpicListResponse, error) {
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.EpicListResponse{}, err
 	}
@@ -107,6 +107,9 @@ func (s *Store) ListEpics(ctx context.Context, projectID string, status string) 
 			return domain.EpicListResponse{}, fmt.Errorf("decode epic: %w", err)
 		}
 		items = append(items, item)
+	}
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
 	}
 
 	return domain.EpicListResponse{ProjectID: projectID, Items: items}, nil
