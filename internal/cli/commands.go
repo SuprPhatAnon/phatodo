@@ -57,8 +57,14 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "config" && args[1] == "list" {
 		return runConfigList(stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "config" && args[1] == "get" {
+		return runConfigGet(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "config" && args[1] == "set" {
 		return runConfigSet(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "config" && args[1] == "unset" {
+		return runConfigUnset(args[2:], stdout, stderr)
 	}
 
 	if knownCommand(args) {
@@ -150,6 +156,74 @@ func runConfigSet(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	item, err := client.SetProjectConfig(context.Background(), cfg.ProjectID, args[0], args[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+	return 0
+}
+
+func runConfigGet(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo config get <key>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := NewAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	item, err := client.GetProjectConfig(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+	return 0
+}
+
+func runConfigUnset(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo config unset <key>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := NewAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	item, err := client.UnsetProjectConfig(context.Background(), cfg.ProjectID, args[0])
 	if err != nil {
 		fmt.Fprintf(stderr, "%v\n", err)
 		return 1

@@ -91,11 +91,27 @@ func (c *APIClient) ListProjectConfig(ctx context.Context, projectID string) ([]
 	return payload.Items, nil
 }
 
+func (c *APIClient) GetProjectConfig(ctx context.Context, projectID string, key string) (ProjectConfigItem, error) {
+	var payload ProjectConfigItem
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/config/%s", url.PathEscape(projectID), url.PathEscape(key)), nil, &payload); err != nil {
+		return ProjectConfigItem{}, err
+	}
+	return payload, nil
+}
+
 func (c *APIClient) SetProjectConfig(ctx context.Context, projectID string, key string, value string) (ProjectConfigItem, error) {
 	var payload ProjectConfigItem
 	if err := c.doJSON(ctx, http.MethodPut, fmt.Sprintf("/api/v1/projects/%s/config/%s", url.PathEscape(projectID), url.PathEscape(key)), domain.ProjectConfigSetRequest{
 		Value: value,
 	}, &payload); err != nil {
+		return ProjectConfigItem{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) UnsetProjectConfig(ctx context.Context, projectID string, key string) (ProjectConfigItem, error) {
+	var payload ProjectConfigItem
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/config/%s", url.PathEscape(projectID), url.PathEscape(key)), nil, &payload); err != nil {
 		return ProjectConfigItem{}, err
 	}
 	return payload, nil

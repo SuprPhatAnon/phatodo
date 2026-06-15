@@ -11,6 +11,7 @@ import (
 )
 
 var ErrProjectNotFound = errors.New("project not found")
+var ErrProjectConfigNotFound = errors.New("project config not found")
 
 type Store struct {
 	pool *pgxpool.Pool
@@ -72,6 +73,22 @@ func (s *Store) ListProjectConfig(ctx context.Context, projectID string) ([]doma
 	return items, nil
 }
 
+func (s *Store) GetProjectConfig(ctx context.Context, projectID string, key string) (domain.ProjectConfig, error) {
+	var item domain.ProjectConfig
+	err := s.pool.QueryRow(ctx, `
+		SELECT key, value
+		FROM project_config
+		WHERE project_id = $1 AND key = $2
+	`, projectID, key).Scan(&item.Key, &item.Value)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProjectConfig{}, ErrProjectConfigNotFound
+		}
+		return domain.ProjectConfig{}, fmt.Errorf("get project config: %w", err)
+	}
+	return item, nil
+}
+
 func (s *Store) SetProjectConfig(ctx context.Context, projectID string, key string, value string) (domain.ProjectConfig, error) {
 	var item domain.ProjectConfig
 	err := s.pool.QueryRow(ctx, `
@@ -99,5 +116,21 @@ func (s *Store) SetProjectConfig(ctx context.Context, projectID string, key stri
 		return domain.ProjectConfig{}, fmt.Errorf("set project config: %w", err)
 	}
 
+	return item, nil
+}
+
+func (s *Store) DeleteProjectConfig(ctx context.Context, projectID string, key string) (domain.ProjectConfig, error) {
+	var item domain.ProjectConfig
+	err := s.pool.QueryRow(ctx, `
+		DELETE FROM project_config
+		WHERE project_id = $1 AND key = $2
+		RETURNING key, value
+	`, projectID, key).Scan(&item.Key, &item.Value)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProjectConfig{}, ErrProjectConfigNotFound
+		}
+		return domain.ProjectConfig{}, fmt.Errorf("delete project config: %w", err)
+	}
 	return item, nil
 }

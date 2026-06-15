@@ -17,10 +17,12 @@ type Config struct {
 
 type ProjectConfigReader interface {
 	ListProjectConfig(context.Context, string) ([]domain.ProjectConfig, error)
+	GetProjectConfig(context.Context, string, string) (domain.ProjectConfig, error)
 }
 
 type ProjectConfigWriter interface {
 	SetProjectConfig(context.Context, string, string, string) (domain.ProjectConfig, error)
+	DeleteProjectConfig(context.Context, string, string) (domain.ProjectConfig, error)
 }
 
 type BootstrapManager interface {

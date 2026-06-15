@@ -55,6 +55,32 @@ func (a *app) listProjectConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *app) getProjectConfig(w http.ResponseWriter, r *http.Request) {
+	if a.config.ProjectConfigReader == nil {
+		respondError(w, http.StatusServiceUnavailable, "config_store_unavailable", "project config store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	key := r.PathValue("key")
+	if key == "" {
+		respondError(w, http.StatusBadRequest, "invalid_request", "config key is required")
+		return
+	}
+
+	item, err := a.config.ProjectConfigReader.GetProjectConfig(r.Context(), projectID, key)
+	if err != nil {
+		if errors.Is(err, postgres.ErrProjectConfigNotFound) {
+			respondError(w, http.StatusNotFound, "project_config_not_found", err.Error())
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "project_config_get_failed", err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, item)
+}
+
 func (a *app) setProjectConfig(w http.ResponseWriter, r *http.Request) {
 	if a.config.ProjectConfigWriter == nil {
 		respondError(w, http.StatusServiceUnavailable, "config_store_unavailable", "project config store is not configured")
@@ -81,6 +107,32 @@ func (a *app) setProjectConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respondError(w, http.StatusInternalServerError, "project_config_set_failed", err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, item)
+}
+
+func (a *app) unsetProjectConfig(w http.ResponseWriter, r *http.Request) {
+	if a.config.ProjectConfigWriter == nil {
+		respondError(w, http.StatusServiceUnavailable, "config_store_unavailable", "project config store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	key := r.PathValue("key")
+	if key == "" {
+		respondError(w, http.StatusBadRequest, "invalid_request", "config key is required")
+		return
+	}
+
+	item, err := a.config.ProjectConfigWriter.DeleteProjectConfig(r.Context(), projectID, key)
+	if err != nil {
+		if errors.Is(err, postgres.ErrProjectConfigNotFound) {
+			respondError(w, http.StatusNotFound, "project_config_not_found", err.Error())
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "project_config_unset_failed", err.Error())
 		return
 	}
 

@@ -77,9 +77,9 @@ func (a *app) registerDependencyRoutes(mux *http.ServeMux) {
 
 func (a *app) registerConfigRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/projects/{projectID}/config", a.withAPIAuth(http.HandlerFunc(a.listProjectConfig)))
-	mux.Handle("GET /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.get"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.getProjectConfig)))
 	mux.Handle("PUT /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.setProjectConfig)))
-	mux.Handle("DELETE /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.unset"))))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.unsetProjectConfig)))
 }
 
 func (a *app) registerQueryRoutes(mux *http.ServeMux) {

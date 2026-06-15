@@ -412,6 +412,9 @@ Required input:
 Server request:
 - `GET /api/v1/projects/{projectID}/config/{key}`
 
+Response:
+- the `{key, value}` row for the requested project config entry
+
 ### `ptodo config set`
 
 Required input:
@@ -434,6 +437,9 @@ Required input:
 
 Server request:
 - `DELETE /api/v1/projects/{projectID}/config/{key}`
+
+Response:
+- the removed `{key, value}` row for the deleted project config entry
 
 ## Search, History, List
 

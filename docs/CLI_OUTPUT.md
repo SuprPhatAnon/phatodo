@@ -41,6 +41,18 @@ issue_prefix=ABC
 issue_prefix=ABC
 ```
 
+`ptodo config get issue_prefix`:
+
+```text
+issue_prefix=ABC
+```
+
+`ptodo config unset issue_prefix`:
+
+```text
+issue_prefix=ABC
+```
+
 ### Tasks and epics
 
 Render:
