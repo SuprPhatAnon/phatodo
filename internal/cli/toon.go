@@ -197,3 +197,10 @@ func writeComment(w io.Writer, indent int, item domain.Comment) {
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
 	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
 }
+
+func writeDependency(w io.Writer, indent int, item domain.Dependency) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "taskId", item.TaskID)
+	writeTOONField(w, indent+1, "dependsOnId", item.DependsOnID)
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+}

@@ -70,9 +70,9 @@ func (a *app) registerCommentRoutes(mux *http.ServeMux) {
 }
 
 func (a *app) registerDependencyRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.notImplemented("dep.list"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.notImplemented("dep.add"))))
-	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("dep.remove"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.listDependencies)))
+	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.addDependency)))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}", a.withAPIAuth(http.HandlerFunc(a.removeDependency)))
 }
 
 func (a *app) registerConfigRoutes(mux *http.ServeMux) {

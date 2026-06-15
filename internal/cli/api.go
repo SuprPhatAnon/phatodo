@@ -38,6 +38,9 @@ type apiClient interface {
 	AddComment(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
 	UpdateComment(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
 	DeleteComment(context.Context, string, string) (domain.Comment, error)
+	ListDependencies(context.Context, string, string) (domain.DependencyListResponse, error)
+	AddDependency(context.Context, string, string, string) (domain.Dependency, error)
+	RemoveDependency(context.Context, string, string, string) (domain.Dependency, error)
 	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
 	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	BootstrapAdmin(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -264,6 +267,30 @@ func (c *APIClient) DeleteComment(ctx context.Context, projectID string, comment
 	var payload domain.Comment
 	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/comments/%s", url.PathEscape(projectID), url.PathEscape(commentID)), nil, &payload); err != nil {
 		return domain.Comment{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ListDependencies(ctx context.Context, projectID string, taskID string) (domain.DependencyListResponse, error) {
+	var payload domain.DependencyListResponse
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/dependencies", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
+		return domain.DependencyListResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) AddDependency(ctx context.Context, projectID string, taskID string, dependsOnID string) (domain.Dependency, error) {
+	var payload domain.Dependency
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/dependencies", url.PathEscape(projectID), url.PathEscape(taskID)), map[string]string{"depends_on_id": dependsOnID}, &payload); err != nil {
+		return domain.Dependency{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) RemoveDependency(ctx context.Context, projectID string, taskID string, dependsOnID string) (domain.Dependency, error) {
+	var payload domain.Dependency
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/dependencies/%s", url.PathEscape(projectID), url.PathEscape(taskID), url.PathEscape(dependsOnID)), nil, &payload); err != nil {
+		return domain.Dependency{}, err
 	}
 	return payload, nil
 }

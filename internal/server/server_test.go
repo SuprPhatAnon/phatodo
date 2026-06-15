@@ -289,6 +289,33 @@ func (f fakeCommentDeleter) DeleteComment(_ context.Context, _ string, _ string,
 	return f.deleteResponse, f.deleteErr
 }
 
+type fakeDependencyLister struct {
+	listResponse domain.DependencyListResponse
+	listErr      error
+}
+
+func (f fakeDependencyLister) ListDependencies(_ context.Context, _ string, _ string) (domain.DependencyListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
+type fakeDependencyAdder struct {
+	addResponse domain.Dependency
+	addErr      error
+}
+
+func (f fakeDependencyAdder) AddDependency(_ context.Context, _ string, _ string, _ string, _ string) (domain.Dependency, error) {
+	return f.addResponse, f.addErr
+}
+
+type fakeDependencyRemover struct {
+	removeResponse domain.Dependency
+	removeErr      error
+}
+
+func (f fakeDependencyRemover) RemoveDependency(_ context.Context, _ string, _ string, _ string, _ string) (domain.Dependency, error) {
+	return f.removeResponse, f.removeErr
+}
+
 type fakeReadyLister struct {
 	listResponse domain.ReadyListResponse
 	listErr      error
@@ -669,6 +696,86 @@ func TestCommentDeleteReturnsComment(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	require.Equal(t, "cmt-1", body["id"])
 	require.Equal(t, "Deleted", body["content"])
+}
+
+func TestDependencyAddReturnsEdge(t *testing.T) {
+	handler := newApp(Config{
+		DependencyAdder: fakeDependencyAdder{
+			addResponse: domain.Dependency{
+				ID:          "dep-1",
+				TaskID:      "ABC-1",
+				DependsOnID: "ABC-2",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/tasks/ABC-1/dependencies", strings.NewReader(`{"depends_on_id":"ABC-2"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "dep-1", body["id"])
+	require.Equal(t, "ABC-1", body["task_id"])
+	require.Equal(t, "ABC-2", body["depends_on_id"])
+}
+
+func TestDependencyListReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		DependencyLister: fakeDependencyLister{
+			listResponse: domain.DependencyListResponse{
+				ProjectID: "project-1",
+				TaskID:    "ABC-1",
+				Items: []domain.Dependency{
+					{ID: "dep-1", TaskID: "ABC-1", DependsOnID: "ABC-2"},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks/ABC-1/dependencies", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+}
+
+func TestDependencyRemoveReturnsEdge(t *testing.T) {
+	handler := newApp(Config{
+		DependencyRemover: fakeDependencyRemover{
+			removeResponse: domain.Dependency{
+				ID:          "dep-1",
+				TaskID:      "ABC-1",
+				DependsOnID: "ABC-2",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/tasks/ABC-1/dependencies/ABC-2", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "dep-1", body["id"])
+	require.Equal(t, "ABC-2", body["depends_on_id"])
 }
 
 func TestReadyReturnsItems(t *testing.T) {

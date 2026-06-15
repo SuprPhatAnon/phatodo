@@ -85,3 +85,15 @@ func TestWriteCommentTOON(t *testing.T) {
 
 	require.Equal(t, "- id: cmt-1\n  author: agent\n  kind: summary\n  content: Done\n", buf.String())
 }
+
+func TestWriteDependencyTOON(t *testing.T) {
+	var buf bytes.Buffer
+
+	writeDependency(&buf, 0, domain.Dependency{
+		ID:          "dep-1",
+		TaskID:      "ABC-1",
+		DependsOnID: "ABC-2",
+	})
+
+	require.Equal(t, "- id: dep-1\n  taskId: ABC-1\n  dependsOnId: ABC-2\n", buf.String())
+}

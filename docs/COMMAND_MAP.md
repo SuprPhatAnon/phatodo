@@ -29,9 +29,9 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [x] `ptodo comment list`
 - [x] `ptodo comment update`
 - [x] `ptodo comment delete`
-- [ ] `ptodo dep add`
-- [ ] `ptodo dep remove`
-- [ ] `ptodo dep list`
+- [x] `ptodo dep add`
+- [x] `ptodo dep remove`
+- [x] `ptodo dep list`
 - [x] `ptodo ready`
 - [ ] `ptodo lock acquire`
 - [ ] `ptodo lock release`
@@ -99,7 +99,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | --- | --- | --- | --- |
 | `ptodo dep add` | `POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies` | `dependencies` | `events`. |
 | `ptodo dep remove` | `DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}` | `dependencies` | `events`. |
-| `ptodo dep list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies` | `dependencies` | None. |
+| `ptodo dep list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies` | `dependencies` | None. Returns direct dependency edges for the task. |
 
 ## Workflow
 

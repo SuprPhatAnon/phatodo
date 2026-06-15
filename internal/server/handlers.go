@@ -324,6 +324,96 @@ func (a *app) deleteComment(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
+func (a *app) listDependencies(w http.ResponseWriter, r *http.Request) {
+	if a.config.DependencyLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "dependency_store_unavailable", "dependency store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	result, err := a.config.DependencyLister.ListDependencies(r.Context(), projectID, taskID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "dependency_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) addDependency(w http.ResponseWriter, r *http.Request) {
+	if a.config.DependencyAdder == nil {
+		respondError(w, http.StatusServiceUnavailable, "dependency_store_unavailable", "dependency store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	dependsOnID, err := decodeDependencyPair(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.DependencyAdder.AddDependency(r.Context(), projectID, taskID, dependsOnID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrDependencyNotFound):
+			respondError(w, http.StatusNotFound, "dependency_not_found", err.Error())
+		case errors.Is(err, postgres.ErrDuplicateDependency):
+			respondError(w, http.StatusConflict, "dependency_exists", err.Error())
+		case errors.Is(err, postgres.ErrDependencyCycle):
+			respondError(w, http.StatusBadRequest, "dependency_cycle", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "dependency_add_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) removeDependency(w http.ResponseWriter, r *http.Request) {
+	if a.config.DependencyRemover == nil {
+		respondError(w, http.StatusServiceUnavailable, "dependency_store_unavailable", "dependency store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	dependsOnID := r.PathValue("dependsOnID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.DependencyRemover.RemoveDependency(r.Context(), projectID, taskID, dependsOnID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrDependencyNotFound):
+			respondError(w, http.StatusNotFound, "dependency_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "dependency_remove_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 func (a *app) showTask(w http.ResponseWriter, r *http.Request) {
 	if a.config.TaskReader == nil {
 		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
@@ -672,6 +762,19 @@ func decodeCommentUpdateRequest(body io.Reader) (domain.CommentUpdateRequest, er
 		return domain.CommentUpdateRequest{}, errors.New("content is required")
 	}
 	return req, nil
+}
+
+func decodeDependencyPair(body io.Reader) (string, error) {
+	var req struct {
+		DependsOnID string `json:"depends_on_id"`
+	}
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return "", err
+	}
+	if req.DependsOnID == "" {
+		return "", errors.New("depends_on_id is required")
+	}
+	return req.DependsOnID, nil
 }
 
 func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {

@@ -196,6 +196,21 @@ type CommentListResponse struct {
 	Items     []Comment `json:"items"`
 }
 
+type Dependency struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspace_id,omitempty"`
+	ProjectID   string    `json:"project_id,omitempty"`
+	TaskID      string    `json:"task_id"`
+	DependsOnID string    `json:"depends_on_id"`
+	CreatedAt   time.Time `json:"created_at,omitempty"`
+}
+
+type DependencyListResponse struct {
+	ProjectID string       `json:"project_id"`
+	TaskID    string       `json:"task_id"`
+	Items     []Dependency `json:"items"`
+}
+
 type ProjectConfig struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`

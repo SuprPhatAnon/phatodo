@@ -32,6 +32,9 @@ func main() {
 	var commentCreator server.CommentCreator
 	var commentUpdater server.CommentUpdater
 	var commentDeleter server.CommentDeleter
+	var dependencyLister server.DependencyLister
+	var dependencyAdder server.DependencyAdder
+	var dependencyRemover server.DependencyRemover
 	var readyLister server.ReadyLister
 	var bootstrapManager server.BootstrapManager
 	if postgresDSN != "" {
@@ -53,6 +56,9 @@ func main() {
 		commentCreator = store
 		commentUpdater = store
 		commentDeleter = store
+		dependencyLister = store
+		dependencyAdder = store
+		dependencyRemover = store
 		readyLister = store
 		bootstrapManager = store
 	}
@@ -72,6 +78,9 @@ func main() {
 		CommentCreator:      commentCreator,
 		CommentUpdater:      commentUpdater,
 		CommentDeleter:      commentDeleter,
+		DependencyLister:    dependencyLister,
+		DependencyAdder:     dependencyAdder,
+		DependencyRemover:   dependencyRemover,
 		ReadyLister:         readyLister,
 		BootstrapManager:    bootstrapManager,
 	})

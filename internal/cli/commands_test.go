@@ -30,6 +30,9 @@ type fakeAPIClient struct {
 	addCommentFn         func(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
 	updateCommentFn      func(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
 	deleteCommentFn      func(context.Context, string, string) (domain.Comment, error)
+	listDependenciesFn   func(context.Context, string, string) (domain.DependencyListResponse, error)
+	addDependencyFn      func(context.Context, string, string, string) (domain.Dependency, error)
+	removeDependencyFn   func(context.Context, string, string, string) (domain.Dependency, error)
 	listReadyTasksFn     func(context.Context, string, string) (domain.ReadyListResponse, error)
 	initAdminFn          func(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	bootstrapAdminFn     func(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -93,6 +96,18 @@ func (f *fakeAPIClient) UpdateComment(ctx context.Context, projectID, commentID 
 
 func (f *fakeAPIClient) DeleteComment(ctx context.Context, projectID, commentID string) (domain.Comment, error) {
 	return f.deleteCommentFn(ctx, projectID, commentID)
+}
+
+func (f *fakeAPIClient) ListDependencies(ctx context.Context, projectID, taskID string) (domain.DependencyListResponse, error) {
+	return f.listDependenciesFn(ctx, projectID, taskID)
+}
+
+func (f *fakeAPIClient) AddDependency(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
+	return f.addDependencyFn(ctx, projectID, taskID, dependsOnID)
+}
+
+func (f *fakeAPIClient) RemoveDependency(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
+	return f.removeDependencyFn(ctx, projectID, taskID, dependsOnID)
 }
 
 func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
@@ -1010,6 +1025,145 @@ func TestRunCommentDeleteCallsServer(t *testing.T) {
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: cmt-1")
 	require.Contains(t, stdout.String(), "content: Deleted")
+}
+
+func TestRunDepAddCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			addDependencyFn: func(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, "ABC-2", dependsOnID)
+				return domain.Dependency{
+					ID:          "dep-1",
+					TaskID:      "ABC-1",
+					DependsOnID: "ABC-2",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"dep", "add", "ABC-1", "ABC-2"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: dep-1")
+	require.Contains(t, stdout.String(), "taskId: ABC-1")
+	require.Contains(t, stdout.String(), "dependsOnId: ABC-2")
+}
+
+func TestRunDepListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			listDependenciesFn: func(ctx context.Context, projectID, taskID string) (domain.DependencyListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				return domain.DependencyListResponse{
+					ProjectID: "default",
+					TaskID:    "ABC-1",
+					Items: []domain.Dependency{
+						{ID: "dep-1", TaskID: "ABC-1", DependsOnID: "ABC-2"},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"dep", "list", "ABC-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "dependencies[1]:")
+	require.Contains(t, stdout.String(), "taskId: ABC-1")
+	require.Contains(t, stdout.String(), "dependsOnId: ABC-2")
+}
+
+func TestRunDepRemoveCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			removeDependencyFn: func(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, "ABC-2", dependsOnID)
+				return domain.Dependency{
+					ID:          "dep-1",
+					TaskID:      "ABC-1",
+					DependsOnID: "ABC-2",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"dep", "remove", "ABC-1", "ABC-2"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: dep-1")
+	require.Contains(t, stdout.String(), "taskId: ABC-1")
+	require.Contains(t, stdout.String(), "dependsOnId: ABC-2")
 }
 
 func TestRunAdminInitCallsServer(t *testing.T) {

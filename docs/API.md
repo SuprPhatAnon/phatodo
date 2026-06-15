@@ -35,7 +35,7 @@ Initial route groups:
 - `/config`, `/search`, `/history`, `/list`, and `/ready`
 - `/locks` for work-item lease acquire/release/list
 
-Most handlers still return structured `501 not_implemented` responses, but the config routes, admin bootstrap routes, the task create/list/show/update/delete routes, the subtask create/list routes, the comment routes, and the ready route are now wired to the Postgres store. This lets the CLI and tests stabilize around URL shape while the remaining command surface is filled in.
+Most handlers still return structured `501 not_implemented` responses, but the config routes, admin bootstrap routes, the task create/list/show/update/delete routes, the subtask create/list routes, the comment routes, the dependency routes, and the ready route are now wired to the Postgres store. This lets the CLI and tests stabilize around URL shape while the remaining command surface is filled in.
 
 Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, comment kind, and audit metadata.
 

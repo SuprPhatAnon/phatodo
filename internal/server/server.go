@@ -22,6 +22,9 @@ type Config struct {
 	CommentCreator      CommentCreator
 	CommentUpdater      CommentUpdater
 	CommentDeleter      CommentDeleter
+	DependencyLister    DependencyLister
+	DependencyAdder     DependencyAdder
+	DependencyRemover   DependencyRemover
 	ReadyLister         ReadyLister
 	BootstrapManager    BootstrapManager
 }
@@ -74,6 +77,18 @@ type CommentUpdater interface {
 
 type CommentDeleter interface {
 	DeleteComment(context.Context, string, string, string) (domain.Comment, error)
+}
+
+type DependencyLister interface {
+	ListDependencies(context.Context, string, string) (domain.DependencyListResponse, error)
+}
+
+type DependencyAdder interface {
+	AddDependency(context.Context, string, string, string, string) (domain.Dependency, error)
+}
+
+type DependencyRemover interface {
+	RemoveDependency(context.Context, string, string, string, string) (domain.Dependency, error)
 }
 
 type ReadyLister interface {

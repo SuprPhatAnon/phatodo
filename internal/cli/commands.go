@@ -97,6 +97,15 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "comment" && args[1] == "delete" {
 		return runCommentDelete(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "dep" && args[1] == "add" {
+		return runDepAdd(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "dep" && args[1] == "remove" {
+		return runDepRemove(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "dep" && args[1] == "list" {
+		return runDepList(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "task" && args[1] == "show" {
 		return runTaskShow(args[2:], stdout, stderr)
 	}
@@ -814,6 +823,113 @@ func runCommentDelete(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
+func runDepAdd(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseDependencyPairArgs("dep add", args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.AddDependency(context.Background(), cfg.ProjectID, opts.taskID, opts.dependsOnID)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeDependency(stdout, 0, resp)
+	return 0
+}
+
+func runDepRemove(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseDependencyPairArgs("dep remove", args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.RemoveDependency(context.Background(), cfg.ProjectID, opts.taskID, opts.dependsOnID)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeDependency(stdout, 0, resp)
+	return 0
+}
+
+func runDepList(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo dep list <task-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListDependencies(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "dependencies", len(resp.Items))
+	for _, item := range resp.Items {
+		writeDependency(stdout, 1, item)
+	}
+	return 0
+}
+
 func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 	opts, err := parseTaskListArgs(args)
 	if err != nil {
@@ -1106,6 +1222,18 @@ func parseCommentUpdateArgs(args []string) (commentUpdateOptions, error) {
 	}
 
 	return commentUpdateOptions{commentID: commentID, content: content}, nil
+}
+
+type dependencyPairOptions struct {
+	taskID      string
+	dependsOnID string
+}
+
+func parseDependencyPairArgs(command string, args []string) (dependencyPairOptions, error) {
+	if len(args) != 2 {
+		return dependencyPairOptions{}, fmt.Errorf("usage: ptodo %s <task-id> <depends-on-id>", command)
+	}
+	return dependencyPairOptions{taskID: args[0], dependsOnID: args[1]}, nil
 }
 
 func runReady(args []string, stdout io.Writer, stderr io.Writer) int {

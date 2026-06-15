@@ -139,6 +139,23 @@ Render:
 - task ID
 - depends-on ID
 
+`ptodo dep add ABC-1 ABC-2`:
+
+```text
+- id: dep-1
+  taskId: ABC-1
+  dependsOnId: ABC-2
+```
+
+`ptodo dep list ABC-1`:
+
+```text
+dependencies[1]:
+  - id: dep-1
+    taskId: ABC-1
+    dependsOnId: ABC-2
+```
+
 ### Locks
 
 Render:

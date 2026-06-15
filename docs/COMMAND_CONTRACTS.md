@@ -391,6 +391,12 @@ Required input:
 Server request:
 - `POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies`
 
+Expected body fields:
+- `depends_on_id`
+
+Response:
+- the created dependency edge
+
 ### `ptodo dep remove`
 
 Required input:
@@ -400,6 +406,9 @@ Required input:
 Server request:
 - `DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}`
 
+Response:
+- the removed dependency edge
+
 ### `ptodo dep list`
 
 Required input:
@@ -407,6 +416,9 @@ Required input:
 
 Server request:
 - `GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies`
+
+Response:
+- a dependency edge list for the task
 
 ## Workflow
 
