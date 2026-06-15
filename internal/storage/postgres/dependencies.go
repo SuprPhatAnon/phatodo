@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	db "github.com/SuprPhatAnon/phatodo/internal/storage/postgres/sqlc"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -22,27 +22,14 @@ func (s *Store) ListDependencies(ctx context.Context, projectID string, taskID s
 		return domain.DependencyListResponse{}, err
 	}
 
-	rows, err := s.pool.Query(ctx, `
-		SELECT id, workspace_id, project_id, task_id, depends_on_id, created_at
-		FROM dependencies
-		WHERE project_id = $1 AND task_id = $2
-		ORDER BY created_at ASC, id ASC
-	`, projectID, taskID)
+	rows, err := s.q.ListDependencies(ctx, db.ListDependenciesParams{ProjectID: projectID, TaskID: taskID})
 	if err != nil {
 		return domain.DependencyListResponse{}, fmt.Errorf("query dependencies: %w", err)
 	}
-	defer rows.Close()
 
 	items := make([]domain.Dependency, 0)
-	for rows.Next() {
-		item, err := scanDependency(rows)
-		if err != nil {
-			return domain.DependencyListResponse{}, fmt.Errorf("scan dependency: %w", err)
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return domain.DependencyListResponse{}, fmt.Errorf("iterate dependencies: %w", err)
+	for _, row := range rows {
+		items = append(items, dependencyFromSQLC(row))
 	}
 
 	return domain.DependencyListResponse{
@@ -60,8 +47,10 @@ func (s *Store) AddDependency(ctx context.Context, projectID string, taskID stri
 	}
 	defer tx.Rollback(ctx)
 
-	var workspaceID string
-	if err := tx.QueryRow(ctx, `SELECT workspace_id FROM projects WHERE id = $1`, projectID).Scan(&workspaceID); err != nil {
+	q := s.q.WithTx(tx)
+
+	workspaceID, err := q.GetProjectWorkspaceID(ctx, projectID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Dependency{}, ErrProjectNotFound
 		}
@@ -79,40 +68,18 @@ func (s *Store) AddDependency(ctx context.Context, projectID string, taskID stri
 		return domain.Dependency{}, err
 	}
 
-	var duplicateID string
-	err = tx.QueryRow(ctx, `
-		SELECT id
-		FROM dependencies
-		WHERE project_id = $1 AND task_id = $2 AND depends_on_id = $3
-	`, projectID, taskID, dependsOnID).Scan(&duplicateID)
-	if err == nil {
+	if _, err := q.GetDependency(ctx, db.GetDependencyParams{ProjectID: projectID, TaskID: taskID, DependsOnID: dependsOnID}); err == nil {
 		return domain.Dependency{}, ErrDuplicateDependency
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return domain.Dependency{}, fmt.Errorf("check duplicate dependency: %w", err)
 	}
 
-	var cycleID string
-	err = tx.QueryRow(ctx, `
-		WITH RECURSIVE chain AS (
-			SELECT task_id, depends_on_id
-			FROM dependencies
-			WHERE project_id = $1 AND task_id = $2
-			UNION ALL
-			SELECT d.task_id, d.depends_on_id
-			FROM dependencies d
-			JOIN chain c ON d.project_id = $1 AND d.task_id = c.depends_on_id
-		)
-		SELECT task_id
-		FROM chain
-		WHERE depends_on_id = $3
-		LIMIT 1
-	`, projectID, dependsOnID, taskID).Scan(&cycleID)
-	if err == nil {
-		return domain.Dependency{}, ErrDependencyCycle
+	hasCycle, err := s.dependencyWouldCycle(ctx, q, projectID, taskID, dependsOnID)
+	if err != nil {
+		return domain.Dependency{}, err
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return domain.Dependency{}, fmt.Errorf("check dependency cycle: %w", err)
+	if hasCycle {
+		return domain.Dependency{}, ErrDependencyCycle
 	}
 
 	dependencyID, err := randomID("dep")
@@ -120,76 +87,142 @@ func (s *Store) AddDependency(ctx context.Context, projectID string, taskID stri
 		return domain.Dependency{}, err
 	}
 
-	var dependency domain.Dependency
-	err = tx.QueryRow(ctx, `
-		INSERT INTO dependencies (
-			id, workspace_id, project_id, task_id, depends_on_id
-		) VALUES (
-			$1, $2, $3, $4, $5
-		)
-		RETURNING id, workspace_id, project_id, task_id, depends_on_id, created_at
-	`, dependencyID, workspaceID, projectID, taskID, dependsOnID).Scan(
-		&dependency.ID,
-		&dependency.WorkspaceID,
-		&dependency.ProjectID,
-		&dependency.TaskID,
-		&dependency.DependsOnID,
-		&dependency.CreatedAt,
-	)
+	dependency, err := q.CreateDependency(ctx, db.CreateDependencyParams{
+		ID:          dependencyID,
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		TaskID:      taskID,
+		DependsOnID: dependsOnID,
+	})
 	if err != nil {
 		return domain.Dependency{}, fmt.Errorf("insert dependency: %w", err)
+	}
+
+	if err := s.recordEventTx(ctx, tx, auditEvent{
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Action:      "add",
+		EntityType:  "dependency",
+		EntityID:    dependency.ID,
+		ActorUserID: actorUserID,
+		ActorLabel:  actorUserID,
+		AfterState:  dependency,
+	}); err != nil {
+		return domain.Dependency{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Dependency{}, fmt.Errorf("commit dependency add: %w", err)
 	}
 
-	return dependency, nil
+	return dependencyFromSQLC(dependency), nil
 }
 
 func (s *Store) RemoveDependency(ctx context.Context, projectID string, taskID string, dependsOnID string, actorUserID string) (domain.Dependency, error) {
-	_ = actorUserID
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.Dependency{}, fmt.Errorf("begin dependency remove tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.Dependency{}, err
 	}
 
-	row := s.pool.QueryRow(ctx, `
-		DELETE FROM dependencies
-		WHERE project_id = $1 AND task_id = $2 AND depends_on_id = $3
-		RETURNING id, workspace_id, project_id, task_id, depends_on_id, created_at
-	`, projectID, taskID, dependsOnID)
-	dependency, err := scanDependency(row)
+	q := s.q.WithTx(tx)
+
+	workspaceID, err := q.GetProjectWorkspaceID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Dependency{}, ErrProjectNotFound
+		}
+		return domain.Dependency{}, fmt.Errorf("lookup project workspace: %w", err)
+	}
+
+	before, err := s.readDependencyTx(ctx, tx, projectID, taskID, dependsOnID)
+	if err != nil {
+		return domain.Dependency{}, err
+	}
+
+	dependency, err := q.DeleteDependency(ctx, db.DeleteDependencyParams{
+		ProjectID:   projectID,
+		TaskID:      taskID,
+		DependsOnID: dependsOnID,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Dependency{}, ErrDependencyNotFound
 		}
 		return domain.Dependency{}, fmt.Errorf("delete dependency: %w", err)
 	}
-	return dependency, nil
+
+	if err := s.recordEventTx(ctx, tx, auditEvent{
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Action:      "remove",
+		EntityType:  "dependency",
+		EntityID:    before.ID,
+		ActorUserID: actorUserID,
+		ActorLabel:  actorUserID,
+		BeforeState: before,
+		AfterState:  nil,
+	}); err != nil {
+		return domain.Dependency{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Dependency{}, fmt.Errorf("commit dependency remove: %w", err)
+	}
+
+	return dependencyFromSQLC(dependency), nil
 }
 
 func (s *Store) loadTaskEdge(ctx context.Context, tx pgx.Tx, projectID string, taskID string) (domain.TaskDetail, error) {
-	row := tx.QueryRow(ctx, taskDetailQuery+` WHERE project_id = $1 AND id = $2`, projectID, taskID)
-	task, err := scanTaskDetail(row)
+	task, err := s.q.WithTx(tx).GetTaskDetail(ctx, db.GetTaskDetailParams{ProjectID: projectID, TaskID: taskID})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.TaskDetail{}, ErrTaskNotFound
 		}
 		return domain.TaskDetail{}, fmt.Errorf("load dependency task: %w", err)
 	}
-	return task, nil
+	return taskDetailFromSQLC(task)
 }
 
-func scanDependency(row interface {
-	Scan(dest ...any) error
-}) (domain.Dependency, error) {
-	var dep domain.Dependency
-	var workspaceID sql.NullString
-	if err := row.Scan(&dep.ID, &workspaceID, &dep.ProjectID, &dep.TaskID, &dep.DependsOnID, &dep.CreatedAt); err != nil {
-		return domain.Dependency{}, err
+func (s *Store) readDependencyTx(ctx context.Context, tx pgx.Tx, projectID string, taskID string, dependsOnID string) (domain.Dependency, error) {
+	dep, err := s.q.WithTx(tx).GetDependency(ctx, db.GetDependencyParams{
+		ProjectID:   projectID,
+		TaskID:      taskID,
+		DependsOnID: dependsOnID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Dependency{}, ErrDependencyNotFound
+		}
+		return domain.Dependency{}, fmt.Errorf("load dependency: %w", err)
 	}
-	if workspaceID.Valid {
-		dep.WorkspaceID = workspaceID.String
+	return dependencyFromSQLC(dep), nil
+}
+
+func (s *Store) dependencyWouldCycle(ctx context.Context, q *db.Queries, projectID string, taskID string, dependsOnID string) (bool, error) {
+	seen := map[string]bool{dependsOnID: true}
+	queue := []string{dependsOnID}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		rows, err := q.ListDependencies(ctx, db.ListDependenciesParams{ProjectID: projectID, TaskID: current})
+		if err != nil {
+			return false, fmt.Errorf("query dependency chain: %w", err)
+		}
+		for _, row := range rows {
+			if row.DependsOnID == taskID {
+				return true, nil
+			}
+			if !seen[row.DependsOnID] {
+				seen[row.DependsOnID] = true
+				queue = append(queue, row.DependsOnID)
+			}
+		}
 	}
-	return dep, nil
+	return false, nil
 }

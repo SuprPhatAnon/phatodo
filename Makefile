@@ -61,8 +61,8 @@ gofmt:
 	gofmt -w $$(rg --files -g '*.go')
 
 sqlc:
-	@command -v sqlc >/dev/null 2>&1 || { echo "sqlc is not installed"; exit 1; }
-	sqlc generate
+	@test -x $(GOPATH)/bin/sqlc || { echo "$(GOPATH)/bin/sqlc is not installed"; exit 1; }
+	$(GOPATH)/bin/sqlc generate
 
 run-ptodo:
 	$(GOFLAGS) $(GO) run ./cmd/ptodo --help

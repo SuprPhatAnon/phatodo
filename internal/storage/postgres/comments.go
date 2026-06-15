@@ -2,11 +2,11 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	db "github.com/SuprPhatAnon/phatodo/internal/storage/postgres/sqlc"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -20,27 +20,14 @@ func (s *Store) ListComments(ctx context.Context, projectID string, taskID strin
 		return domain.CommentListResponse{}, err
 	}
 
-	rows, err := s.pool.Query(ctx, `
-		SELECT id, workspace_id, project_id, task_id, author_user_id, author, kind, content, created_at, updated_at
-		FROM comments
-		WHERE project_id = $1 AND task_id = $2
-		ORDER BY created_at ASC, id ASC
-	`, projectID, taskID)
+	rows, err := s.q.ListComments(ctx, db.ListCommentsParams{ProjectID: projectID, TaskID: taskID})
 	if err != nil {
 		return domain.CommentListResponse{}, fmt.Errorf("query comments: %w", err)
 	}
-	defer rows.Close()
 
 	items := make([]domain.Comment, 0)
-	for rows.Next() {
-		item, err := scanComment(rows)
-		if err != nil {
-			return domain.CommentListResponse{}, fmt.Errorf("scan comment: %w", err)
-		}
-		items = append(items, item)
-	}
-	if err := rows.Err(); err != nil {
-		return domain.CommentListResponse{}, fmt.Errorf("iterate comments: %w", err)
+	for _, row := range rows {
+		items = append(items, commentFromSQLC(row))
 	}
 
 	return domain.CommentListResponse{
@@ -58,15 +45,17 @@ func (s *Store) CreateComment(ctx context.Context, projectID string, taskID stri
 	defer tx.Rollback(ctx)
 
 	var workspaceID string
-	if err := tx.QueryRow(ctx, `SELECT workspace_id FROM projects WHERE id = $1`, projectID).Scan(&workspaceID); err != nil {
+	q := s.q.WithTx(tx)
+
+	workspaceID, err = q.GetProjectWorkspaceID(ctx, projectID)
+	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Comment{}, ErrProjectNotFound
 		}
 		return domain.Comment{}, fmt.Errorf("lookup project: %w", err)
 	}
 
-	var existingTaskID string
-	if err := tx.QueryRow(ctx, `SELECT id FROM tasks WHERE project_id = $1 AND id = $2`, projectID, taskID).Scan(&existingTaskID); err != nil {
+	if _, err := q.GetTaskDetail(ctx, db.GetTaskDetailParams{ProjectID: projectID, TaskID: taskID}); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Comment{}, ErrTaskNotFound
 		}
@@ -78,29 +67,32 @@ func (s *Store) CreateComment(ctx context.Context, projectID string, taskID stri
 		return domain.Comment{}, err
 	}
 
-	var comment domain.Comment
-	err = tx.QueryRow(ctx, `
-		INSERT INTO comments (
-			id, workspace_id, project_id, task_id, author_user_id, author, kind, content
-		) VALUES (
-			$1, $2, $3, $4, NULLIF($5, ''), $6, $7, $8
-		)
-		RETURNING `+commentSelectList,
-		commentID, workspaceID, projectID, taskID, actorUserID, req.Author, req.Kind, req.Content,
-	).Scan(
-		&comment.ID,
-		&comment.WorkspaceID,
-		&comment.ProjectID,
-		&comment.TaskID,
-		&comment.AuthorUserID,
-		&comment.Author,
-		&comment.Kind,
-		&comment.Content,
-		&comment.CreatedAt,
-		&comment.UpdatedAt,
-	)
+	commentRow, err := q.CreateComment(ctx, db.CreateCommentParams{
+		ID:           commentID,
+		WorkspaceID:  workspaceID,
+		ProjectID:    projectID,
+		TaskID:       taskID,
+		AuthorUserID: actorUserID,
+		Author:       req.Author,
+		Kind:         req.Kind,
+		Content:      req.Content,
+	})
 	if err != nil {
 		return domain.Comment{}, fmt.Errorf("insert comment: %w", err)
+	}
+	comment := commentFromSQLC(commentRow)
+
+	if err := s.recordEventTx(ctx, tx, auditEvent{
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Action:      "create",
+		EntityType:  "comment",
+		EntityID:    comment.ID,
+		ActorUserID: actorUserID,
+		ActorLabel:  actorUserID,
+		AfterState:  comment,
+	}); err != nil {
+		return domain.Comment{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -111,71 +103,144 @@ func (s *Store) CreateComment(ctx context.Context, projectID string, taskID stri
 }
 
 func (s *Store) UpdateComment(ctx context.Context, projectID string, commentID string, req domain.CommentUpdateRequest, actorUserID string) (domain.Comment, error) {
-	_ = actorUserID
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.Comment{}, fmt.Errorf("begin comment update tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.Comment{}, err
 	}
 
-	row := s.pool.QueryRow(ctx, `
-		UPDATE comments
-		SET content = $1,
-			updated_at = now()
-		WHERE project_id = $2 AND id = $3
-		RETURNING `+commentSelectList, req.Content, projectID, commentID)
-	comment, err := scanComment(row)
+	q := s.q.WithTx(tx)
+
+	workspaceID, err := q.GetProjectWorkspaceID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Comment{}, ErrProjectNotFound
+		}
+		return domain.Comment{}, fmt.Errorf("lookup project workspace: %w", err)
+	}
+
+	before, err := s.readCommentTx(ctx, tx, projectID, commentID)
+	if err != nil {
+		return domain.Comment{}, err
+	}
+
+	commentRow, err := q.UpdateComment(ctx, db.UpdateCommentParams{
+		Content:   req.Content,
+		ProjectID: projectID,
+		CommentID: commentID,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Comment{}, ErrCommentNotFound
 		}
 		return domain.Comment{}, fmt.Errorf("update comment: %w", err)
 	}
-	return comment, nil
+
+	if err := s.recordEventTx(ctx, tx, auditEvent{
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Action:      "update",
+		EntityType:  "comment",
+		EntityID:    commentID,
+		ActorUserID: actorUserID,
+		ActorLabel:  actorUserID,
+		BeforeState: before,
+		AfterState:  commentRow,
+	}); err != nil {
+		return domain.Comment{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Comment{}, fmt.Errorf("commit comment update: %w", err)
+	}
+
+	return commentFromSQLC(commentRow), nil
 }
 
 func (s *Store) DeleteComment(ctx context.Context, projectID string, commentID string, actorUserID string) (domain.Comment, error) {
-	_ = actorUserID
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return domain.Comment{}, fmt.Errorf("begin comment delete tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	if err := s.ensureProjectExists(ctx, projectID); err != nil {
 		return domain.Comment{}, err
 	}
 
-	row := s.pool.QueryRow(ctx, `
-		DELETE FROM comments
-		WHERE project_id = $1 AND id = $2
-		RETURNING `+commentSelectList, projectID, commentID)
-	comment, err := scanComment(row)
+	q := s.q.WithTx(tx)
+
+	workspaceID, err := q.GetProjectWorkspaceID(ctx, projectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Comment{}, ErrProjectNotFound
+		}
+		return domain.Comment{}, fmt.Errorf("lookup project workspace: %w", err)
+	}
+
+	before, err := s.readCommentTx(ctx, tx, projectID, commentID)
+	if err != nil {
+		return domain.Comment{}, err
+	}
+
+	commentRow, err := q.DeleteComment(ctx, db.DeleteCommentParams{ProjectID: projectID, CommentID: commentID})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Comment{}, ErrCommentNotFound
 		}
 		return domain.Comment{}, fmt.Errorf("delete comment: %w", err)
 	}
-	return comment, nil
-}
 
-const commentSelectList = `
-	id, workspace_id, project_id, task_id, author_user_id, author, kind, content, created_at, updated_at`
-
-func scanComment(row interface {
-	Scan(dest ...any) error
-}) (domain.Comment, error) {
-	var comment domain.Comment
-	var authorUserID sql.NullString
-	if err := row.Scan(
-		&comment.ID,
-		&comment.WorkspaceID,
-		&comment.ProjectID,
-		&comment.TaskID,
-		&authorUserID,
-		&comment.Author,
-		&comment.Kind,
-		&comment.Content,
-		&comment.CreatedAt,
-		&comment.UpdatedAt,
-	); err != nil {
+	if err := s.recordEventTx(ctx, tx, auditEvent{
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+		Action:      "delete",
+		EntityType:  "comment",
+		EntityID:    commentID,
+		ActorUserID: actorUserID,
+		ActorLabel:  actorUserID,
+		BeforeState: before,
+		AfterState:  nil,
+	}); err != nil {
 		return domain.Comment{}, err
 	}
-	if authorUserID.Valid {
-		comment.AuthorUserID = authorUserID.String
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Comment{}, fmt.Errorf("commit comment delete: %w", err)
 	}
-	return comment, nil
+
+	return commentFromSQLC(commentRow), nil
+}
+
+func (s *Store) readCommentTx(ctx context.Context, tx pgx.Tx, projectID string, commentID string) (domain.Comment, error) {
+	comment, err := s.q.WithTx(tx).GetComment(ctx, db.GetCommentParams{ProjectID: projectID, CommentID: commentID})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Comment{}, ErrCommentNotFound
+		}
+		return domain.Comment{}, fmt.Errorf("load comment: %w", err)
+	}
+	return commentFromSQLC(comment), nil
+}
+
+func commentFromSQLC(row db.Comment) domain.Comment {
+	comment := domain.Comment{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		TaskID:      row.TaskID,
+		Author:      row.Author,
+		Kind:        row.Kind,
+		Content:     row.Content,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}
+	if row.AuthorUserID != nil {
+		comment.AuthorUserID = *row.AuthorUserID
+	}
+	return comment
 }

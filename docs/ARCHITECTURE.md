@@ -24,6 +24,8 @@ Postgres stores canonical state and audit history. Local `.phatodo` data should 
 
 The database model is documented in `docs/DATABASE_SCHEMA.md`. It follows Trekker's SQLite schema while adding a `workspaces` layer above individual projects and accountability fields for ownership, completion evidence, audit history, and time-bound work locks.
 
+All Postgres access should be defined in `sqlc` query files under `internal/storage/postgres/queries/` and regenerated through `make sqlc`; handwritten SQL in Go is not the intended steady-state.
+
 Authentication is server-side. Users authenticate with an access key and access secret for CLI/API calls, with optional username/password credentials for dashboard login. Admin users can access all projects; regular users are limited to one project through `user_project_access`.
 
 ## API Scope

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	db "github.com/SuprPhatAnon/phatodo/internal/storage/postgres/sqlc"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -26,12 +27,14 @@ func (s *Store) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (dom
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+	q := s.q.WithTx(tx)
+
+	if err := q.LockUsersTable(ctx); err != nil {
 		return domain.AdminInitResponse{}, fmt.Errorf("lock users table: %w", err)
 	}
 
-	var adminCount int
-	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM users WHERE role = 'admin'`).Scan(&adminCount); err != nil {
+	adminCount, err := q.CountAdminUsers(ctx)
+	if err != nil {
 		return domain.AdminInitResponse{}, fmt.Errorf("count admin users: %w", err)
 	}
 	if adminCount > 0 {
@@ -55,12 +58,16 @@ func (s *Store) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (dom
 		return domain.AdminInitResponse{}, fmt.Errorf("hash admin password: %w", err)
 	}
 
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO users (
-			id, display_name, role, access_key, access_secret_hash,
-			username, password_hash
-		) VALUES ($1, $2, 'admin', $3, $4, $5, $6)
-	`, userID, req.Username, accessKey, accessSecretHash, req.Username, string(passwordHash)); err != nil {
+	username := req.Username
+	passwordHashValue := string(passwordHash)
+	if err := q.InsertAdminUser(ctx, db.InsertAdminUserParams{
+		ID:               userID,
+		DisplayName:      req.Username,
+		AccessKey:        accessKey,
+		AccessSecretHash: accessSecretHash,
+		Username:         &username,
+		PasswordHash:     &passwordHashValue,
+	}); err != nil {
 		return domain.AdminInitResponse{}, fmt.Errorf("insert admin user: %w", err)
 	}
 
@@ -83,7 +90,9 @@ func (s *Store) BootstrapProject(ctx context.Context, req domain.AdminBootstrapR
 	}
 	defer tx.Rollback(ctx)
 
-	admin, err := s.lookupAdmin(ctx, tx, req.Username)
+	q := s.q.WithTx(tx)
+
+	admin, err := s.lookupAdmin(ctx, q, req.Username)
 	if err != nil {
 		return domain.AdminBootstrapResponse{}, err
 	}
@@ -91,11 +100,11 @@ func (s *Store) BootstrapProject(ctx context.Context, req domain.AdminBootstrapR
 		return domain.AdminBootstrapResponse{}, ErrInvalidAdminCredentials
 	}
 
-	workspaceID, err := s.ensureWorkspace(ctx, tx, req.WorkspaceName)
+	workspaceID, err := s.ensureWorkspace(ctx, q, req.WorkspaceName)
 	if err != nil {
 		return domain.AdminBootstrapResponse{}, err
 	}
-	projectID, err := s.ensureProject(ctx, tx, workspaceID, req.ProjectName)
+	projectID, err := s.ensureProject(ctx, q, workspaceID, req.ProjectName)
 	if err != nil {
 		return domain.AdminBootstrapResponse{}, err
 	}
@@ -114,19 +123,20 @@ func (s *Store) BootstrapProject(ctx context.Context, req domain.AdminBootstrapR
 	}
 
 	displayName := req.ProjectName + " CLI"
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO users (
-			id, display_name, role, access_key, access_secret_hash
-		) VALUES ($1, $2, 'user', $3, $4)
-	`, cliUserID, displayName, cliAccessKey, cliAccessSecretHash); err != nil {
+	if err := q.InsertBootstrapUser(ctx, db.InsertBootstrapUserParams{
+		ID:               cliUserID,
+		DisplayName:      displayName,
+		AccessKey:        cliAccessKey,
+		AccessSecretHash: cliAccessSecretHash,
+	}); err != nil {
 		return domain.AdminBootstrapResponse{}, fmt.Errorf("insert bootstrap cli user: %w", err)
 	}
 
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO user_project_access (
-			user_id, workspace_id, project_id
-		) VALUES ($1, $2, $3)
-	`, cliUserID, workspaceID, projectID); err != nil {
+	if err := q.InsertUserProjectAccess(ctx, db.InsertUserProjectAccessParams{
+		UserID:      cliUserID,
+		WorkspaceID: workspaceID,
+		ProjectID:   projectID,
+	}); err != nil {
 		return domain.AdminBootstrapResponse{}, fmt.Errorf("insert project access: %w", err)
 	}
 
@@ -142,32 +152,31 @@ func (s *Store) BootstrapProject(ctx context.Context, req domain.AdminBootstrapR
 	}, nil
 }
 
-func (s *Store) lookupAdmin(ctx context.Context, tx pgx.Tx, username string) (domain.User, error) {
-	var user domain.User
-	err := tx.QueryRow(ctx, `
-		SELECT id, display_name, role, access_key, access_secret_hash, username, password_hash
-		FROM users
-		WHERE username = $1 AND role = 'admin'
-		LIMIT 1
-	`, username).Scan(
-		&user.ID,
-		&user.DisplayName,
-		&user.Role,
-		&user.AccessKey,
-		&user.AccessSecretHash,
-		&user.Username,
-		&user.PasswordHash,
-	)
+func (s *Store) lookupAdmin(ctx context.Context, q *db.Queries, username string) (domain.User, error) {
+	row, err := q.LookupAdminByUsername(ctx, &username)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.User{}, ErrInvalidAdminCredentials
 		}
 		return domain.User{}, fmt.Errorf("lookup admin: %w", err)
 	}
+	user := domain.User{
+		ID:               row.ID,
+		DisplayName:      row.DisplayName,
+		Role:             domain.UserRole(row.Role),
+		AccessKey:        row.AccessKey,
+		AccessSecretHash: row.AccessSecretHash,
+	}
+	if row.Username != nil {
+		user.Username = *row.Username
+	}
+	if row.PasswordHash != nil {
+		user.PasswordHash = *row.PasswordHash
+	}
 	return user, nil
 }
 
-func (s *Store) ensureWorkspace(ctx context.Context, tx pgx.Tx, name string) (string, error) {
+func (s *Store) ensureWorkspace(ctx context.Context, q *db.Queries, name string) (string, error) {
 	slug := slugify(name)
 	if slug == "" {
 		slug = "phatodo"
@@ -178,13 +187,7 @@ func (s *Store) ensureWorkspace(ctx context.Context, tx pgx.Tx, name string) (st
 		return "", err
 	}
 
-	var workspaceID string
-	err = tx.QueryRow(ctx, `
-		INSERT INTO workspaces (id, name, slug)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (slug) DO NOTHING
-		RETURNING id
-	`, id, name, slug).Scan(&workspaceID)
+	workspaceID, err := q.CreateWorkspace(ctx, db.CreateWorkspaceParams{ID: id, Name: name, Slug: slug})
 	if err == nil {
 		return workspaceID, nil
 	}
@@ -192,19 +195,15 @@ func (s *Store) ensureWorkspace(ctx context.Context, tx pgx.Tx, name string) (st
 		return "", fmt.Errorf("insert workspace: %w", err)
 	}
 
-	if err := tx.QueryRow(ctx, `SELECT id FROM workspaces WHERE slug = $1`, slug).Scan(&workspaceID); err != nil {
+	workspaceID, err = q.GetWorkspaceIDBySlug(ctx, slug)
+	if err != nil {
 		return "", fmt.Errorf("select workspace: %w", err)
 	}
 	return workspaceID, nil
 }
 
-func (s *Store) ensureProject(ctx context.Context, tx pgx.Tx, workspaceID string, name string) (string, error) {
-	var existing string
-	if err := tx.QueryRow(ctx, `
-		SELECT id
-		FROM projects
-		WHERE workspace_id = $1 AND name = $2
-	`, workspaceID, name).Scan(&existing); err == nil {
+func (s *Store) ensureProject(ctx context.Context, q *db.Queries, workspaceID string, name string) (string, error) {
+	if _, err := q.GetProjectIDByWorkspaceAndName(ctx, db.GetProjectIDByWorkspaceAndNameParams{WorkspaceID: workspaceID, Name: name}); err == nil {
 		return "", ErrProjectAlreadyExists
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return "", fmt.Errorf("check project existence: %w", err)
@@ -215,13 +214,7 @@ func (s *Store) ensureProject(ctx context.Context, tx pgx.Tx, workspaceID string
 		return "", err
 	}
 
-	var projectID string
-	err = tx.QueryRow(ctx, `
-		INSERT INTO projects (id, workspace_id, name)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (workspace_id, name) DO NOTHING
-		RETURNING id
-	`, id, workspaceID, name).Scan(&projectID)
+	projectID, err := q.CreateProject(ctx, db.CreateProjectParams{ID: id, WorkspaceID: workspaceID, Name: name})
 	if err == nil {
 		return projectID, nil
 	}
