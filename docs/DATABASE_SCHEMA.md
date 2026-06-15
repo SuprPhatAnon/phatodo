@@ -45,3 +45,7 @@ IDs remain `TEXT` so imported Trekker IDs can be preserved. Status and priority 
 Subtasks are stored in `tasks`, not a separate table, because that is how Trekker models them today. This keeps migration/import simpler and preserves unified task search, history, dependency, and comment behavior.
 
 Completion-related fields are intentionally explicit so the server can enforce accountability: tasks and epics can record who owns work, who completed it, what evidence was used, and which summary or checkpoint comment was left behind.
+
+The implementation sequence for wiring the CLI, API, and database together is documented in `docs/IMPLEMENTATION_PLAN.md`.
+
+The schema-backed CLI extensions that expose these fields are listed in `docs/CLI_COMPATIBILITY.md`, and their endpoint/table mapping is documented in `docs/COMMAND_MAP.md`.

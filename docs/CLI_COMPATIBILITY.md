@@ -1,6 +1,6 @@
 # CLI Compatibility
 
-The `phatodo` and `ptd` executables should keep the Trekker command shape from `docs/trekker_reference.txt` while moving storage to the server.
+The `phatodo`, `ptd`, and `ptodo` executables should keep the command shape preserved in `docs/trekker_reference.txt` while moving storage to the server.
 
 ## Required Command Groups
 
@@ -16,6 +16,18 @@ The `phatodo` and `ptd` executables should keep the Trekker command shape from `
 ## Behavior
 
 Support `--toon` for compact agent output. Preserve status values, priority values, and task workflow rules from the Trekker reference. Prefer additive enhancements over breaking command changes.
+
+`config list` is the first server-backed command and should print the project configuration returned from `/api/v1/projects/{projectID}/config`.
+
+## Schema-Driven Extensions
+
+The Trekker-compatible command surface is extended to cover schema-backed fields that are not explicit in the original reference:
+
+- `-a/--assigned-to` for task and epic ownership
+- `--criteria-json` for acceptance criteria
+- `--summary` and `--evidence-json` for completion metadata
+- `-k/--kind` for comment type
+- `lock acquire`, `lock release`, and `lock list` for `work_item_locks`
 
 ## Client Configuration
 

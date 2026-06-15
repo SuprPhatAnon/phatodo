@@ -1,6 +1,8 @@
-# Trekker Quickstart
+# Phatodo Command Reference
 
-Issue tracker for AI agents. Data stored in `.trekker/trekker.db`.
+Trekker-derived command shape preserved by `phatodo`, `ptd`, and `ptodo`.
+
+Issue tracker for AI agents. Canonical data is stored on the server; local `.phatodo/config.json` holds client configuration.
 
 ## Setup
 trekker init                    # Initialize
@@ -17,28 +19,28 @@ trekker wipe -y                 # Remove all data
 ## Commands
 
 ### Epics (features/milestones)
-trekker epic create -t "Title" [-d "desc"] [-p 0-5]
+trekker epic create -t "Title" [-d "desc"] [-p 0-5] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 trekker epic list [--status <status>]
 trekker epic show <epic-id>
-trekker epic update <epic-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>]
+trekker epic update <epic-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
 trekker epic complete <epic-id>   # Complete and archive all tasks
 trekker epic delete <epic-id>
 
 ### Tasks
-trekker task create -t "Title" [-d "desc"] [-p 0-5] [-e <epic-id>] [--tags "a,b"]
+trekker task create -t "Title" [-d "desc"] [-p 0-5] [-e <epic-id>] [--tags "a,b"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 trekker task list [--status <status>] [--epic <epic-id>]
 trekker task show <task-id>
-trekker task update <task-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [--tags "a,b"] [-e <epic-id>] [--no-epic]
+trekker task update <task-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [--tags "a,b"] [-e <epic-id>] [--no-epic] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
 trekker task delete <task-id>
 
 ### Subtasks
-trekker subtask create <task-id> -t "Title" [-d "desc"] [-p 0-5]
+trekker subtask create <task-id> -t "Title" [-d "desc"] [-p 0-5] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 trekker subtask list <task-id>
-trekker subtask update <subtask-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>]
+trekker subtask update <subtask-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
 trekker subtask delete <subtask-id>
 
 ### Comments (external memory)
-trekker comment add <task-id> -a "agent" -c "content"
+trekker comment add <task-id> -a "agent" -c "content" [-k comment|analysis|summary|checkpoint|handoff]
 trekker comment list <task-id>
 trekker comment update <comment-id> -c "new content"
 trekker comment delete <comment-id>
@@ -47,6 +49,11 @@ trekker comment delete <comment-id>
 trekker dep add <task-id> <depends-on-id>
 trekker dep remove <task-id> <depends-on-id>
 trekker dep list <task-id>
+
+### Locks
+trekker lock acquire <entity-type> <entity-id> [--reason "why"] [--expires 1h]
+trekker lock release <lock-id>
+trekker lock list [--type epic,task,subtask] [--entity <entity-id>] [--active]
 
 ### Project Config
 trekker config list
@@ -132,4 +139,3 @@ Good: "Implement JWT auth for API.
 - Create middleware in src/middleware/auth.ts
 - Use bcrypt for password hashing
 - Protect: /api/users, /api/tasks"
-

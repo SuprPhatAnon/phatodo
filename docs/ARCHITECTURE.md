@@ -2,13 +2,14 @@
 
 Phatodo has two deliverables:
 
-1. Trekker-compatible command-line executables named `phatodo` and `ptd`.
+1. Trekker-compatible command-line executables named `phatodo`, `ptd`, and `ptodo`.
 2. A server-side API and dashboard backed by Postgres.
 
 ## Components
 
 - `cmd/phatodo` is the primary CLI entrypoint. It should preserve the command structure documented in `docs/trekker_reference.txt`.
 - `cmd/ptd` is the short CLI alias entrypoint.
+- `cmd/ptodo` is the additional CLI alias entrypoint.
 - `cmd/phatodo-server` is the API and dashboard server entrypoint.
 - `internal/cli` owns command parsing, output modes such as `--toon`, and API client wiring.
 - `internal/server` owns HTTP routing for JSON APIs and dashboard delivery.
@@ -19,7 +20,7 @@ Phatodo has two deliverables:
 
 ## Runtime Model
 
-The CLI is a client. It should read local configuration for workspace ID, project ID, API URL, and auth token, then call the central API. The server is the state authority for tasks, comments, dependencies, locks, search, history, and project configuration.
+The CLI is a client. It should read local configuration for workspace ID, project ID, API URL, access key, and access secret, then call the central API. The server is the state authority for tasks, comments, dependencies, locks, search, history, and project configuration.
 
 Postgres stores canonical state and audit history. Local `.phatodo` data should be limited to client configuration and optional cache data.
 
@@ -32,3 +33,9 @@ Authentication is server-side. Users authenticate with an access key and access 
 The API should expose resources for epics, tasks, subtasks, comments, dependencies, config, search, history, and unified list views. Server-side validation should enforce lifecycle rules, including requiring a summary comment before task completion and checking completion evidence against explicit acceptance criteria.
 
 The non-dashboard API scaffold is documented in `docs/API.md`. It uses `/api/v1` routes, access-key headers, and project-scoped resource paths.
+
+The build order and intended end state are documented in `docs/IMPLEMENTATION_PLAN.md`.
+
+The concrete CLI-to-API-to-database request path is documented in `docs/DATAFLOW.md`.
+
+The command-to-endpoint-to-table matrix is documented in `docs/COMMAND_MAP.md`.

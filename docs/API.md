@@ -31,7 +31,16 @@ Initial route groups:
 - `/tasks/{taskID}/comments` and `/comments/{commentID}`
 - `/tasks/{taskID}/dependencies`
 - `/config`, `/search`, `/history`, and `/list`
+- `/locks` for work-item lease acquire/release/list
 
 Handlers currently return structured `501 not_implemented` responses. This lets the CLI and tests stabilize around URL shape before Postgres repositories are wired in.
 
 Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, comment kind, and audit metadata.
+
+The first wired read path is `GET /api/v1/projects/{projectID}/config`, which returns a project-scoped list of `{key, value}` config entries for the CLI `config list` command.
+
+The broader route and data rollout plan is described in `docs/IMPLEMENTATION_PLAN.md`.
+
+The concrete request/handler/storage path for this route is documented in `docs/DATAFLOW.md`.
+
+The full command-to-endpoint-to-table map is documented in `docs/COMMAND_MAP.md`.
