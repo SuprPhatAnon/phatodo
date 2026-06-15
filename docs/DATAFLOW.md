@@ -119,6 +119,72 @@ For `ptodo config get`, the server responds with the requested `{key, value}` ro
 
 For `ptodo config unset`, the server responds with the removed `{key, value}` row and the CLI prints `key=value` for confirmation.
 
+## Current End-to-End Flow: `task create`
+
+### 1. Command entry
+
+- `cmd/ptodo/main.go` calls `cli.Run`.
+- `internal/cli/commands.go` recognizes `task create`.
+
+### 2. Local config load
+
+- `internal/cli/commands.go` reads `<repo>/.phatodo/config.json` via `internal/config.ReadLocal`.
+- The CLI uses `api_url`, `project_id`, `access_key`, and `access_secret` from that file.
+
+### 3. HTTP request build
+
+- `internal/cli/api.go` creates the request.
+- Method: `POST`
+- URL: `{{api_url}}/api/v1/projects/{projectID}/tasks`
+- Body fields:
+  - `title`
+  - `issue_prefix`
+  - `description`
+  - `priority`
+  - `epic_id`
+  - `tags`
+  - `assigned_to`
+  - `acceptance_criteria`
+- Headers:
+  - `X-Phatodo-Access-Key: <access_key>`
+  - `X-Phatodo-Access-Secret: <access_secret>`
+
+### 4. Server route handling
+
+- `cmd/phatodo-server/main.go` constructs `server.Config`.
+- If `PHATODO_DATABASE_URL` is set, it creates the Postgres store and wires it as the task creator.
+- `internal/server/app.go` routes `POST /api/v1/projects/{projectID}/tasks` to `createTask`.
+- `internal/server/auth.go` requires the access key and access secret headers before the handler runs.
+
+### 5. Repository query
+
+- `internal/server/handlers.go` calls `TaskCreator.CreateTask`.
+- `internal/storage/postgres/tasks.go` allocates a per-project task counter in `id_counters`, generates the task ID from the supplied issue prefix, and inserts the row into `tasks`.
+
+### 6. Response shape
+
+The server responds with:
+
+```json
+{
+  "id": "ABC-1",
+  "issue_prefix": "ABC",
+  "title": "Write docs",
+  "status": "todo",
+  "priority": 2,
+  "project_id": "default",
+  "workspace_id": "default"
+}
+```
+
+The CLI prints that as:
+
+```text
+id=ABC-1
+issue_prefix=ABC
+title=Write docs
+```
+
 ## Bootstrap Flow
 
 The bootstrap path is split into two steps:

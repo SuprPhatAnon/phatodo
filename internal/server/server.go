@@ -12,6 +12,7 @@ type Config struct {
 	PostgresDSN         string
 	ProjectConfigReader ProjectConfigReader
 	ProjectConfigWriter ProjectConfigWriter
+	TaskCreator         TaskCreator
 	BootstrapManager    BootstrapManager
 }
 
@@ -23,6 +24,10 @@ type ProjectConfigReader interface {
 type ProjectConfigWriter interface {
 	SetProjectConfig(context.Context, string, string, string) (domain.ProjectConfig, error)
 	DeleteProjectConfig(context.Context, string, string) (domain.ProjectConfig, error)
+}
+
+type TaskCreator interface {
+	CreateTask(context.Context, string, domain.TaskCreateRequest, string) (domain.TaskCreateResponse, error)
 }
 
 type BootstrapManager interface {

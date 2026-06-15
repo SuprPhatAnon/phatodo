@@ -199,6 +199,15 @@ func (f fakeBootstrapManager) BootstrapProject(_ context.Context, _ domain.Admin
 	return f.bootstrapResponse, f.bootstrapErr
 }
 
+type fakeTaskCreator struct {
+	createResponse domain.TaskCreateResponse
+	createErr      error
+}
+
+func (f fakeTaskCreator) CreateTask(_ context.Context, _ string, _ domain.TaskCreateRequest, _ string) (domain.TaskCreateResponse, error) {
+	return f.createResponse, f.createErr
+}
+
 func TestAdminInitReturnsCreatedAdmin(t *testing.T) {
 	handler := newApp(Config{
 		BootstrapManager: fakeBootstrapManager{
@@ -249,4 +258,36 @@ func TestAdminBootstrapReturnsProjectConfig(t *testing.T) {
 	require.Equal(t, "ws_1", body["workspace_id"])
 	require.Equal(t, "prj_1", body["project_id"])
 	require.Equal(t, "key_1", body["access_key"])
+}
+
+func TestTaskCreateReturnsTask(t *testing.T) {
+	handler := newApp(Config{
+		TaskCreator: fakeTaskCreator{
+			createResponse: domain.TaskCreateResponse{
+				ID:          "ABC-1",
+				IssuePrefix: "ABC",
+				Title:       "Write docs",
+				Status:      domain.StatusTodo,
+				Priority:    domain.PriorityMedium,
+				ProjectID:   "project-1",
+				WorkspaceID: "workspace-1",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/tasks", strings.NewReader(`{"title":"Write docs","issue_prefix":"ABC","priority":2,"tags":["docs"]}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "ABC-1", body["id"])
+	require.Equal(t, "ABC", body["issue_prefix"])
+	require.Equal(t, "Write docs", body["title"])
 }

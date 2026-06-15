@@ -139,6 +139,40 @@ func (a *app) unsetProjectConfig(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, item)
 }
 
+func (a *app) createTask(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskCreator == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	req, err := decodeTaskCreateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.TaskCreator.CreateTask(r.Context(), projectID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrAssignedUserNotFound):
+			respondError(w, http.StatusNotFound, "assigned_user_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidIssuePrefix):
+			respondError(w, http.StatusBadRequest, "invalid_issue_prefix", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "task_create_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
 func (a *app) adminInit(w http.ResponseWriter, r *http.Request) {
 	if a.config.BootstrapManager == nil {
 		respondError(w, http.StatusServiceUnavailable, "bootstrap_store_unavailable", "bootstrap store is not configured")
@@ -264,6 +298,20 @@ func decodeProjectConfigSetRequest(body io.Reader) (domain.ProjectConfigSetReque
 	var req domain.ProjectConfigSetRequest
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return domain.ProjectConfigSetRequest{}, err
+	}
+	return req, nil
+}
+
+func decodeTaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error) {
+	var req domain.TaskCreateRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.TaskCreateRequest{}, err
+	}
+	if req.Title == "" {
+		return domain.TaskCreateRequest{}, errors.New("title is required")
+	}
+	if req.IssuePrefix == "" {
+		return domain.TaskCreateRequest{}, errors.New("issue_prefix is required")
 	}
 	return req, nil
 }

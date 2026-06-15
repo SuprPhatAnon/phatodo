@@ -240,6 +240,58 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "theme=dark")
 }
 
+func TestRunTaskCreateCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/v1/projects/default/tasks", r.URL.Path)
+		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
+		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, "Write docs", body["title"])
+		require.Equal(t, "ABC", body["issue_prefix"])
+		require.Equal(t, "dark", body["tags"].([]any)[0])
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":           "ABC-1",
+			"issue_prefix": "ABC",
+			"title":        "Write docs",
+			"status":       "todo",
+			"priority":     2,
+			"project_id":   "default",
+			"workspace_id": "default",
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := config.LocalConfig{
+		APIURL:       server.URL,
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--tags", "dark"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "id=ABC-1")
+	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+}
+
 func TestRunAdminInitCallsServer(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

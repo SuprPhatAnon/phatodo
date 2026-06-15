@@ -59,6 +59,27 @@ type Task struct {
 	UpdatedAt    time.Time
 }
 
+type TaskCreateRequest struct {
+	Title              string    `json:"title"`
+	IssuePrefix        string    `json:"issue_prefix"`
+	Description        string    `json:"description"`
+	Priority           *Priority `json:"priority,omitempty"`
+	EpicID             string    `json:"epic_id"`
+	Tags               []string  `json:"tags"`
+	AssignedTo         string    `json:"assigned_to"`
+	AcceptanceCriteria []string  `json:"acceptance_criteria"`
+}
+
+type TaskCreateResponse struct {
+	ID          string   `json:"id"`
+	IssuePrefix string   `json:"issue_prefix"`
+	Title       string   `json:"title"`
+	Status      Status   `json:"status"`
+	Priority    Priority `json:"priority"`
+	ProjectID   string   `json:"project_id"`
+	WorkspaceID string   `json:"workspace_id"`
+}
+
 type Epic struct {
 	ID          string
 	WorkspaceID string

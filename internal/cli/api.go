@@ -117,6 +117,14 @@ func (c *APIClient) UnsetProjectConfig(ctx context.Context, projectID string, ke
 	return payload, nil
 }
 
+func (c *APIClient) CreateTask(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+	var payload domain.TaskCreateResponse
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/tasks", url.PathEscape(projectID)), req, &payload); err != nil {
+		return domain.TaskCreateResponse{}, err
+	}
+	return payload, nil
+}
+
 func (c *APIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
 	var payload adminInitResponse
 	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/admin/init", req, &payload); err != nil {

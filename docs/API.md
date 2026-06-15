@@ -28,7 +28,7 @@ Initial route groups:
 - `GET|POST /api/v1/projects`
 - `GET|PATCH|DELETE /api/v1/projects/{projectID}`
 - `/epics` for epic list/create/show/update/complete/delete
-- `/tasks` for task list/create/show/update/delete
+- `/tasks` for task list/create/show/update/delete; task create accepts `issue_prefix` so the server can generate the task ID from the command input
 - `/tasks/{taskID}/subtasks` for subtask list/create
 - `/tasks/{taskID}/comments` and `/comments/{commentID}`
 - `/tasks/{taskID}/dependencies`

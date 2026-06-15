@@ -54,7 +54,7 @@ func (a *app) registerEpicRoutes(mux *http.ServeMux) {
 
 func (a *app) registerTaskRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.list"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.create"))))
+	mux.Handle("POST /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.createTask)))
 	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.show"))))
 	mux.Handle("PATCH /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.update"))))
 	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.delete"))))

@@ -22,6 +22,7 @@ func main() {
 
 	var projectConfigStore server.ProjectConfigReader
 	var projectConfigWriter server.ProjectConfigWriter
+	var taskCreator server.TaskCreator
 	var bootstrapManager server.BootstrapManager
 	if postgresDSN != "" {
 		store, err := postgres.NewStore(ctx, postgresDSN)
@@ -32,6 +33,7 @@ func main() {
 		defer store.Close()
 		projectConfigStore = store
 		projectConfigWriter = store
+		taskCreator = store
 		bootstrapManager = store
 	}
 
@@ -40,6 +42,7 @@ func main() {
 		PostgresDSN:         postgresDSN,
 		ProjectConfigReader: projectConfigStore,
 		ProjectConfigWriter: projectConfigWriter,
+		TaskCreator:         taskCreator,
 		BootstrapManager:    bootstrapManager,
 	})
 

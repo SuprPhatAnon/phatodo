@@ -16,7 +16,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo epic update`
 - [ ] `ptodo epic complete`
 - [ ] `ptodo epic delete`
-- [ ] `ptodo task create`
+- [x] `ptodo task create`
 - [ ] `ptodo task list`
 - [ ] `ptodo task show`
 - [ ] `ptodo task update`

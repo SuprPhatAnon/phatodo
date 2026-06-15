@@ -225,6 +225,9 @@ Expected body fields:
 - `assigned_to`
 - `acceptance_criteria`
 
+Response:
+- the created task row, including generated task ID and the normalized issue prefix used to create it
+
 ### `ptodo task list`
 
 Optional filters:
