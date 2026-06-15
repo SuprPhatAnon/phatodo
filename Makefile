@@ -12,6 +12,7 @@ KUBE_NAMESPACE ?= phatodo
 KUBE_ROLLOUT_TIMEOUT ?= 180s
 DOCKER_SERVICES ?= $(if $(filter all,$(SERVICE)),gateway market sports-mlb sports-mlb-audit sports-mlb-umpire-profiles models-mlb-mcmc-v2 migrate,$(SERVICE))
 IMAGE ?= $(REGISTRY)/phatodo:$(TAG)
+KUBE_IMAGE ?= localhost:30500/phatodo:$(TAG)
 K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
 GOMODCACHE ?= /tmp/phatodo-go-mod
@@ -88,8 +89,9 @@ k3s-render:
 deploy: deploy-k3s
 
 deploy-k3s:
+	kubectl create namespace $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -k $(K3S_DIR) -n $(KUBE_NAMESPACE)
-	kubectl set image deployment/phatodo-server phatodo-server=$(IMAGE) -n $(KUBE_NAMESPACE)
+	kubectl set image deployment/phatodo-server phatodo-server=$(KUBE_IMAGE) -n $(KUBE_NAMESPACE)
 	kubectl rollout status deployment/phatodo-server -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)
 
 clean:

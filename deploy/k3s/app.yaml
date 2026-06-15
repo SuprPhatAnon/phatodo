@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: phatodo-server
-          image: 10.80.0.85:30500/phatodo:latest
+          image: localhost:30500/phatodo:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

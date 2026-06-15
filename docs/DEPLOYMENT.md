@@ -8,7 +8,7 @@ Build the server image from the repository root:
 make docker-build
 ```
 
-The image contains both binaries and defaults to `phatodo-server`. The Makefile tags it as `$(REGISTRY)/phatodo:$(TAG)`, which defaults to `10.80.0.85:30500/phatodo:latest`. Use `TAG=...` or `REGISTRY=...` to override that if needed.
+The image contains both binaries and defaults to `phatodo-server`. The Makefile tags it as `$(REGISTRY)/phatodo:$(TAG)`, which defaults to `10.80.0.85:30500/phatodo:latest`.
 
 Push the image to the cluster-local registry with:
 
@@ -44,10 +44,12 @@ TLS is optional. The checked-in k3s bundle does not require cert-manager or a ce
 
 Run database migrations separately after Postgres is available. The current server image includes `migrations/`, but no migration runner has been implemented yet.
 
-The checked-in k3s bundle targets the `phatodo` namespace and the default image tag from the Makefile. If you change `REGISTRY`, `TAG`, or `KUBE_NAMESPACE`, use the same values when deploying.
+The checked-in k3s bundle targets the `phatodo` namespace and pulls `localhost:30500/phatodo:$(TAG)` by default. The Makefile still builds and pushes the image to `$(REGISTRY)/phatodo:$(TAG)` for the registry side of the workflow. If you change `REGISTRY`, `TAG`, or `KUBE_NAMESPACE`, use the same values when deploying.
 
 Apply and wait for rollout with:
 
 ```sh
 make deploy-k3s
 ```
+
+The deploy target creates `$(KUBE_NAMESPACE)` first with an idempotent `kubectl create namespace ... --dry-run=client -o yaml | kubectl apply -f -` step, then applies the k3s bundle, updates the `phatodo-server` image to `$(KUBE_IMAGE)`, and waits for the rollout to finish.
