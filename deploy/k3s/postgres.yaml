@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: trakkr-postgres
+  namespace: trakkr
+spec:
+  selector:
+    app: trakkr-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: trakkr-postgres
+  namespace: trakkr
+spec:
+  serviceName: trakkr-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trakkr-postgres
+  template:
+    metadata:
+      labels:
+        app: trakkr-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: trakkr-postgres
+                  key: database
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: trakkr-postgres
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: trakkr-postgres
+                  key: password
+          ports:
+            - name: postgres
+              containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "trakkr", "-d", "trakkr"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

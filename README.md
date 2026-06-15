@@ -19,9 +19,13 @@ trakkr - centralized AI task tracking
 ## Development
 
 ```sh
-go run ./cmd/trakkr --help
-go run ./cmd/trakkr-server
-go test ./...
+make build
+make test
+make run-cli
+make run-server
+make compose-up
 ```
 
 The server listens on `:8080` by default. Set `TRAKKR_ADDR` to override the address and `TRAKKR_DATABASE_URL` when wiring Postgres storage.
+
+See `docs/DEPLOYMENT.md` for Docker, Compose, and k3s deployment notes.
