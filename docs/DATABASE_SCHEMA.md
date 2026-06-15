@@ -25,7 +25,7 @@ Authorization rules should be enforced by the API:
 
 ## Trekker Table Mapping
 
-- `users` and `user_project_access` are trakkr additions for centralized auth.
+- `users` and `user_project_access` are phatodo additions for centralized auth.
 - `projects` maps to Trekker projects, now scoped under `workspaces`.
 - `project_config` maps Trekker config keys, now scoped per project instead of globally.
 - `id_counters` maps Trekker ID counters, now scoped per project.

@@ -1,6 +1,6 @@
 # CLI Compatibility
 
-The `trakkr` executable should keep the Trekker command shape from `docs/trekker_reference.txt` while moving storage to the server.
+The `phatodo` and `ptd` executables should keep the Trekker command shape from `docs/trekker_reference.txt` while moving storage to the server.
 
 ## Required Command Groups
 
@@ -19,11 +19,15 @@ Support `--toon` for compact agent output. Preserve status values, priority valu
 
 ## Client Configuration
 
-`trakkr init` should write local project configuration only:
+`phatodo init` and `ptd init` should write local project configuration only:
 
+- workspace ID
 - project ID
 - API base URL
-- auth token
+- access key
+- access secret
 - optional cache metadata
+
+The local file lives at `.phatodo/config.json` and must not be committed. It should be created with mode `0600` because it contains the access secret.
 
 Canonical task data belongs on the server.

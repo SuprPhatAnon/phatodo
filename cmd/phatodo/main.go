@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/SuprPhatAnon/trakkr/internal/cli"
+	"github.com/SuprPhatAnon/phatodo/internal/cli"
 )
 
 func main() {

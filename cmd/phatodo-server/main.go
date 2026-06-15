@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/SuprPhatAnon/trakkr/internal/server"
+	"github.com/SuprPhatAnon/phatodo/internal/server"
 )
 
 func main() {
-	addr := env("TRAKKR_ADDR", ":8080")
-	postgresDSN := env("TRAKKR_DATABASE_URL", "")
+	addr := env("PHATODO_ADDR", ":8080")
+	postgresDSN := env("PHATODO_DATABASE_URL", "")
 
 	srv := server.New(server.Config{
 		Addr:        addr,
@@ -28,7 +28,7 @@ func main() {
 
 	errs := make(chan error, 1)
 	go func() {
-		slog.Info("starting trakkr server", "addr", addr)
+		slog.Info("starting phatodo server", "addr", addr)
 		errs <- srv.ListenAndServe()
 	}()
 

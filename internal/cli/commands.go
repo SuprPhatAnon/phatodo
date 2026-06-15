@@ -3,7 +3,10 @@ package cli
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
+
+	"github.com/SuprPhatAnon/phatodo/internal/config"
 )
 
 var commandGroups = []struct {
@@ -36,14 +39,36 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 2
 	}
 
+	if args[0] == "init" {
+		return runInit(stdout, stderr)
+	}
+
 	if knownCommand(args) {
-		fmt.Fprintf(stdout, "trakkr command scaffold accepted: %s\n", strings.Join(args, " "))
+		fmt.Fprintf(stdout, "phatodo command scaffold accepted: %s\n", strings.Join(args, " "))
 		return 0
 	}
 
 	fmt.Fprintf(stderr, "unknown command: %s\n\n", strings.Join(args, " "))
 	printHelp(stderr)
 	return 2
+}
+
+func runInit(stdout io.Writer, stderr io.Writer) int {
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	path, err := config.WriteLocal(workdir, config.DefaultLocalConfig())
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize local config: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "initialized local phatodo config at %s\n", path)
+	fmt.Fprintln(stdout, "edit api_url, workspace_id, project_id, access_key, and access_secret before using server-backed commands")
+	return 0
 }
 
 func knownCommand(args []string) bool {
@@ -68,10 +93,13 @@ func equalPrefix(args []string, parts []string) bool {
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "trakkr - centralized Trekker-compatible task tracking")
+	fmt.Fprintln(w, "phatodo - centralized Trekker-compatible task tracking")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  trakkr [--toon] <command> [flags]")
+	fmt.Fprintln(w, "  phatodo [--toon] <command> [flags]")
+	fmt.Fprintln(w, "  ptd [--toon] <command> [flags]")
+	fmt.Fprintln(w, "  phatodo init")
+	fmt.Fprintln(w, "  ptd init")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Command groups:")
 	for _, group := range commandGroups {

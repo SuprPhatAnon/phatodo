@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: trakkr-postgres
-  namespace: trakkr
+  name: phatodo-postgres
+  namespace: phatodo
 spec:
   selector:
-    app: trakkr-postgres
+    app: phatodo-postgres
   ports:
     - name: postgres
       port: 5432
@@ -14,18 +14,18 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: trakkr-postgres
-  namespace: trakkr
+  name: phatodo-postgres
+  namespace: phatodo
 spec:
-  serviceName: trakkr-postgres
+  serviceName: phatodo-postgres
   replicas: 1
   selector:
     matchLabels:
-      app: trakkr-postgres
+      app: phatodo-postgres
   template:
     metadata:
       labels:
-        app: trakkr-postgres
+        app: phatodo-postgres
     spec:
       containers:
         - name: postgres
@@ -34,17 +34,17 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: trakkr-postgres
+                  name: phatodo-postgres
                   key: database
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: trakkr-postgres
+                  name: phatodo-postgres
                   key: username
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: trakkr-postgres
+                  name: phatodo-postgres
                   key: password
           ports:
             - name: postgres
@@ -54,7 +54,7 @@ spec:
               mountPath: /var/lib/postgresql/data
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "trakkr", "-d", "trakkr"]
+              command: ["pg_isready", "-U", "phatodo", "-d", "phatodo"]
             initialDelaySeconds: 5
             periodSeconds: 10
   volumeClaimTemplates:

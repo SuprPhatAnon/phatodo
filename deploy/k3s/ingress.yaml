@@ -1,24 +1,24 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: trakkr
-  namespace: trakkr
+  name: phatodo
+  namespace: phatodo
   annotations:
     cert-manager.io/issuer: letsencrypt-prod
 spec:
   ingressClassName: traefik
   tls:
     - hosts:
-        - trakkr.example.com
-      secretName: trakkr-tls
+        - phatodo.example.com
+      secretName: phatodo-tls
   rules:
-    - host: trakkr.example.com
+    - host: phatodo.example.com
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: trakkr-server
+                name: phatodo-server
                 port:
                   name: http

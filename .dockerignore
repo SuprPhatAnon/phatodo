@@ -1,6 +1,9 @@
 .git
+.phatodo
+.trakkr
 .trekker
-trakkr
-trakkr-server
+/phatodo
+/phatodo-server
+/ptd
 *.db
 tmp

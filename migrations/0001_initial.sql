@@ -1,4 +1,4 @@
--- Initial Postgres schema for centralized, Trekker-compatible trakkr.
+-- Initial Postgres schema for centralized, Trekker-compatible phatodo.
 -- Trekker's SQLite schema is the baseline; this version adds workspaces so
 -- one server/database can host many individual projects.
 

@@ -1,3 +1,3 @@
-module github.com/SuprPhatAnon/trakkr
+module github.com/SuprPhatAnon/phatodo
 
 go 1.26

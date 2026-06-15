@@ -1,30 +1,32 @@
+name: phatodo
+
 services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: trakkr
-      POSTGRES_USER: trakkr
-      POSTGRES_PASSWORD: trakkr_dev_password
+      POSTGRES_DB: phatodo
+      POSTGRES_USER: phatodo
+      POSTGRES_PASSWORD: phatodo_dev_password
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trakkr -d trakkr"]
+      test: ["CMD-SHELL", "pg_isready -U phatodo -d phatodo"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  trakkr-server:
+  phatodo-server:
     build:
       context: .
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      TRAKKR_ADDR: ":8080"
-      TRAKKR_DATABASE_URL: "postgres://trakkr:trakkr_dev_password@postgres:5432/trakkr?sslmode=disable"
+      PHATODO_ADDR: ":8080"
+      PHATODO_DATABASE_URL: "postgres://phatodo:phatodo_dev_password@postgres:5432/phatodo?sslmode=disable"
     ports:
       - "8080:8080"
 

@@ -8,10 +8,10 @@ Build the server image from the repository root:
 make docker-build
 ```
 
-The image contains both binaries, but runs `trakkr-server` by default. Configure it with:
+The image contains both binaries, but runs `phatodo-server` by default. Configure it with:
 
-- `TRAKKR_ADDR`, default `:8080`
-- `TRAKKR_DATABASE_URL`, a Postgres connection string
+- `PHATODO_ADDR`, default `:8080`
+- `PHATODO_DATABASE_URL`, a Postgres connection string
 
 ## Local Compose
 
@@ -27,7 +27,7 @@ Compose exposes the server at `http://localhost:8080` and Postgres at `localhost
 
 The manifests in `deploy/k3s/` deploy:
 
-- `trakkr-server` Deployment and Service
+- `phatodo-server` Deployment and Service
 - Postgres StatefulSet and Service
 - Postgres Secret
 - Traefik Ingress
