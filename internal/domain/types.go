@@ -23,20 +23,46 @@ const (
 	PrioritySomeday
 )
 
+type UserRole string
+
+const (
+	UserRoleAdmin UserRole = "admin"
+	UserRoleUser  UserRole = "user"
+)
+
+type User struct {
+	ID               string
+	DisplayName      string
+	Role             UserRole
+	AccessKey        string
+	AccessSecretHash string
+	Username         string
+	PasswordHash     string
+	DisabledAt       *time.Time
+	LastSeenAt       *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type Task struct {
-	ID          string
-	EpicID      string
-	Title       string
-	Description string
-	Status      Status
-	Priority    Priority
-	Tags        []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           string
+	WorkspaceID  string
+	ProjectID    string
+	EpicID       string
+	ParentTaskID string
+	Title        string
+	Description  string
+	Status       Status
+	Priority     Priority
+	Tags         []string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type Epic struct {
 	ID          string
+	WorkspaceID string
+	ProjectID   string
 	Title       string
 	Description string
 	Status      Status
@@ -46,10 +72,12 @@ type Epic struct {
 }
 
 type Comment struct {
-	ID        string
-	EntityID  string
-	Author    string
-	Content   string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	WorkspaceID string
+	ProjectID   string
+	TaskID      string
+	Author      string
+	Content     string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

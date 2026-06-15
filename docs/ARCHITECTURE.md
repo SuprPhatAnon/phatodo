@@ -18,9 +18,13 @@
 
 ## Runtime Model
 
-The CLI is a client. It should read local configuration for project ID, API URL, and auth token, then call the central API. The server is the state authority for tasks, comments, dependencies, locks, search, history, and project configuration.
+The CLI is a client. It should read local configuration for workspace ID, project ID, API URL, and auth token, then call the central API. The server is the state authority for tasks, comments, dependencies, locks, search, history, and project configuration.
 
 Postgres stores canonical state and audit history. Local `.trakkr` data should be limited to client configuration and optional cache data.
+
+The database model is documented in `docs/DATABASE_SCHEMA.md`. It follows Trekker's SQLite schema while adding a `workspaces` layer above individual projects.
+
+Authentication is server-side. Users authenticate with an access key and access secret for CLI/API calls, with optional username/password credentials for dashboard login. Admin users can access all projects; regular users are limited to one project through `user_project_access`.
 
 ## API Scope
 
