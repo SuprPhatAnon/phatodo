@@ -4,8 +4,8 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 
 ## Implementation Checklist
 
-- [ ] `ptodo admin init`
-- [ ] `ptodo admin bootstrap`
+- [x] `ptodo admin init`
+- [x] `ptodo admin bootstrap`
 - [x] `ptodo config list`
 - [x] `ptodo config get`
 - [x] `ptodo config set`
@@ -36,9 +36,9 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo lock acquire`
 - [ ] `ptodo lock release`
 - [ ] `ptodo lock list`
-- [ ] `ptodo search`
-- [ ] `ptodo history`
-- [ ] `ptodo list`
+- [x] `ptodo search`
+- [x] `ptodo history`
+- [x] `ptodo list`
 
 ## Conventions
 

@@ -316,6 +316,33 @@ func (f fakeDependencyRemover) RemoveDependency(_ context.Context, _ string, _ s
 	return f.removeResponse, f.removeErr
 }
 
+type fakeSearcher struct {
+	searchResponse domain.SearchResponse
+	searchErr      error
+}
+
+func (f fakeSearcher) Search(_ context.Context, _ string, _ string, _ string, _ string, _ int) (domain.SearchResponse, error) {
+	return f.searchResponse, f.searchErr
+}
+
+type fakeHistorian struct {
+	historyResponse domain.HistoryResponse
+	historyErr      error
+}
+
+func (f fakeHistorian) History(_ context.Context, _ string, _ string, _ string, _ string, _ string, _ int) (domain.HistoryResponse, error) {
+	return f.historyResponse, f.historyErr
+}
+
+type fakeListLister struct {
+	listResponse domain.ListResponse
+	listErr      error
+}
+
+func (f fakeListLister) ListUnified(_ context.Context, _ string, _ string, _ string, _ string, _ string, _ int) (domain.ListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
 type fakeReadyLister struct {
 	listResponse domain.ReadyListResponse
 	listErr      error
@@ -484,6 +511,108 @@ func TestTaskCreateReturnsTask(t *testing.T) {
 	require.Equal(t, "ABC-1", body["id"])
 	require.Equal(t, "ABC", body["issue_prefix"])
 	require.Equal(t, "Write docs", body["title"])
+}
+
+func TestSearchReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		Searcher: fakeSearcher{
+			searchResponse: domain.SearchResponse{
+				ProjectID: "project-1",
+				Query:     "auth bug",
+				Items: []domain.SearchItem{
+					{
+						EntityType: "task",
+						ID:         "ABC-1",
+						Title:      "Fix auth bug",
+						Status:     domain.StatusTodo,
+					},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/search?q=auth+bug&type=task&status=todo&limit=10", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+	require.Equal(t, "auth bug", body["query"])
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+}
+
+func TestHistoryReturnsEvents(t *testing.T) {
+	handler := newApp(Config{
+		Historian: fakeHistorian{
+			historyResponse: domain.HistoryResponse{
+				ProjectID: "project-1",
+				Items: []domain.HistoryEvent{
+					{
+						ID:         1,
+						EntityType: "task",
+						EntityID:   "ABC-1",
+						Action:     "update",
+					},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/history?entity=ABC-1&type=task&action=update&since=2025-01-01&limit=5", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+}
+
+func TestListReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		ListLister: fakeListLister{
+			listResponse: domain.ListResponse{
+				ProjectID: "project-1",
+				Items: []domain.UnifiedListItem{
+					{
+						EntityType: "epic",
+						ID:         "EPIC-1",
+						Title:      "Track auth",
+						Status:     domain.StatusTodo,
+						Priority:   domain.PriorityCritical,
+					},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/list?type=epic,task&status=todo&priority=0,1&sort=priority:asc,created:desc&limit=2", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
 }
 
 func TestSubtaskCreateReturnsTask(t *testing.T) {

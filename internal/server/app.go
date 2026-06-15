@@ -83,8 +83,8 @@ func (a *app) registerConfigRoutes(mux *http.ServeMux) {
 }
 
 func (a *app) registerQueryRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/search", a.withAPIAuth(http.HandlerFunc(a.notImplemented("search"))))
-	mux.Handle("GET /api/v1/projects/{projectID}/history", a.withAPIAuth(http.HandlerFunc(a.notImplemented("history"))))
-	mux.Handle("GET /api/v1/projects/{projectID}/list", a.withAPIAuth(http.HandlerFunc(a.notImplemented("list"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/search", a.withAPIAuth(http.HandlerFunc(a.search)))
+	mux.Handle("GET /api/v1/projects/{projectID}/history", a.withAPIAuth(http.HandlerFunc(a.history)))
+	mux.Handle("GET /api/v1/projects/{projectID}/list", a.withAPIAuth(http.HandlerFunc(a.listUnified)))
 	mux.Handle("GET /api/v1/projects/{projectID}/ready", a.withAPIAuth(http.HandlerFunc(a.listReadyTasks)))
 }

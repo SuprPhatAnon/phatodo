@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/SuprPhatAnon/phatodo/internal/config"
@@ -41,6 +42,9 @@ type apiClient interface {
 	ListDependencies(context.Context, string, string) (domain.DependencyListResponse, error)
 	AddDependency(context.Context, string, string, string) (domain.Dependency, error)
 	RemoveDependency(context.Context, string, string, string) (domain.Dependency, error)
+	Search(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
+	History(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
+	ListUnified(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
 	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
 	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	BootstrapAdmin(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -295,6 +299,85 @@ func (c *APIClient) RemoveDependency(ctx context.Context, projectID string, task
 	return payload, nil
 }
 
+func (c *APIClient) Search(ctx context.Context, projectID string, query string, entityType string, status string, limit int) (domain.SearchResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "search")
+	q := endpoint.Query()
+	q.Set("q", query)
+	if entityType != "" {
+		q.Set("type", entityType)
+	}
+	if status != "" {
+		q.Set("status", status)
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	endpoint.RawQuery = q.Encode()
+
+	var payload domain.SearchResponse
+	if err := c.doGETJSON(ctx, endpoint.String(), &payload); err != nil {
+		return domain.SearchResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) History(ctx context.Context, projectID string, entityID string, entityType string, action string, since string, limit int) (domain.HistoryResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "history")
+	q := endpoint.Query()
+	if entityID != "" {
+		q.Set("entity", entityID)
+	}
+	if entityType != "" {
+		q.Set("type", entityType)
+	}
+	if action != "" {
+		q.Set("action", action)
+	}
+	if since != "" {
+		q.Set("since", since)
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	endpoint.RawQuery = q.Encode()
+
+	var payload domain.HistoryResponse
+	if err := c.doGETJSON(ctx, endpoint.String(), &payload); err != nil {
+		return domain.HistoryResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ListUnified(ctx context.Context, projectID string, entityType string, status string, priority string, sort string, limit int) (domain.ListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "list")
+	q := endpoint.Query()
+	if entityType != "" {
+		q.Set("type", entityType)
+	}
+	if status != "" {
+		q.Set("status", status)
+	}
+	if priority != "" {
+		q.Set("priority", priority)
+	}
+	if sort != "" {
+		q.Set("sort", sort)
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	endpoint.RawQuery = q.Encode()
+
+	var payload domain.ListResponse
+	if err := c.doGETJSON(ctx, endpoint.String(), &payload); err != nil {
+		return domain.ListResponse{}, err
+	}
+	return payload, nil
+}
+
 func (c *APIClient) ListReadyTasks(ctx context.Context, projectID string, epicID string) (domain.ReadyListResponse, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "ready")
@@ -336,6 +419,42 @@ func (c *APIClient) ListReadyTasks(ctx context.Context, projectID string, epicID
 	}
 
 	return payload, nil
+}
+
+func (c *APIClient) doGETJSON(ctx context.Context, urlString string, responseBody any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlString, nil)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("call api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		message := resp.Status
+		if msg, ok := body["message"].(string); ok && msg != "" {
+			message = msg
+		}
+		if code, ok := body["error"].(string); ok && code != "" {
+			return fmt.Errorf("%s: %s", code, message)
+		}
+		return fmt.Errorf("api request failed: %s", message)
+	}
+
+	if responseBody == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(responseBody); err != nil {
+		return fmt.Errorf("decode api response: %w", err)
+	}
+	return nil
 }
 
 func (c *APIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {

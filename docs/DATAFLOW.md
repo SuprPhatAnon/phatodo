@@ -372,7 +372,6 @@ The next layers will add:
 - remaining task lifecycle operations beyond create/list
 - `comments`
 - `dependencies`
-- `events`
 - `work_item_locks`
 - `search_index`
 
@@ -380,10 +379,9 @@ The next layers will add:
 
 These pieces are still planned, not implemented:
 
-- `config get`, `config set`, and `config unset`
-- `epic`, `subtask`, `comment`, `dep`, `search`, `history`, and `list` command backends
+- `epic` command backends
+- `lock` command backends
 - project creation and access-management flows
-- write-path audit history
 - lock management
 
 ## Canonical References

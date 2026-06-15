@@ -33,6 +33,9 @@ type fakeAPIClient struct {
 	listDependenciesFn   func(context.Context, string, string) (domain.DependencyListResponse, error)
 	addDependencyFn      func(context.Context, string, string, string) (domain.Dependency, error)
 	removeDependencyFn   func(context.Context, string, string, string) (domain.Dependency, error)
+	searchFn             func(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
+	historyFn            func(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
+	listUnifiedFn        func(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
 	listReadyTasksFn     func(context.Context, string, string) (domain.ReadyListResponse, error)
 	initAdminFn          func(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	bootstrapAdminFn     func(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -108,6 +111,18 @@ func (f *fakeAPIClient) AddDependency(ctx context.Context, projectID, taskID, de
 
 func (f *fakeAPIClient) RemoveDependency(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
 	return f.removeDependencyFn(ctx, projectID, taskID, dependsOnID)
+}
+
+func (f *fakeAPIClient) Search(ctx context.Context, projectID, query, entityType, status string, limit int) (domain.SearchResponse, error) {
+	return f.searchFn(ctx, projectID, query, entityType, status, limit)
+}
+
+func (f *fakeAPIClient) History(ctx context.Context, projectID, entityID, entityType, action, since string, limit int) (domain.HistoryResponse, error) {
+	return f.historyFn(ctx, projectID, entityID, entityType, action, since, limit)
+}
+
+func (f *fakeAPIClient) ListUnified(ctx context.Context, projectID, entityType, status, priority, sortSpec string, limit int) (domain.ListResponse, error) {
+	return f.listUnifiedFn(ctx, projectID, entityType, status, priority, sortSpec, limit)
 }
 
 func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
@@ -240,6 +255,180 @@ func TestRunReadyCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "- id: CORE-1")
 	require.Contains(t, stdout.String(), "dependents[1]{id,title,status,priority}:")
 	require.Contains(t, stdout.String(), "CORE-5,Backups,todo,1")
+}
+
+func TestRunSearchCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			searchFn: func(ctx context.Context, projectID, query, entityType, status string, limit int) (domain.SearchResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "auth bug", query)
+				require.Equal(t, "task", entityType)
+				require.Equal(t, "todo", status)
+				require.Equal(t, 10, limit)
+				return domain.SearchResponse{
+					ProjectID: "default",
+					Query:     query,
+					Items: []domain.SearchItem{
+						{
+							EntityType: "task",
+							ID:         "ABC-1",
+							Title:      "Fix auth bug",
+							Status:     domain.StatusTodo,
+							Priority:   domain.PriorityHigh,
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"search", "auth bug", "--type", "task", "--status", "todo", "--limit", "10"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "search[1]:")
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "entityType: task")
+	require.Contains(t, stdout.String(), `title: "Fix auth bug"`)
+}
+
+func TestRunHistoryCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			historyFn: func(ctx context.Context, projectID, entityID, entityType, action, since string, limit int) (domain.HistoryResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", entityID)
+				require.Equal(t, "task", entityType)
+				require.Equal(t, "update", action)
+				require.Equal(t, "2025-01-01", since)
+				require.Equal(t, 5, limit)
+				return domain.HistoryResponse{
+					ProjectID: "default",
+					Items: []domain.HistoryEvent{
+						{
+							ID:         42,
+							EntityType: "task",
+							EntityID:   "ABC-1",
+							Action:     "update",
+							ActorLabel: "alice",
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"history", "--entity", "ABC-1", "--type", "task", "--action", "update", "--since", "2025-01-01", "--limit", "5"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "history[1]:")
+	require.Contains(t, stdout.String(), "- id: 42")
+	require.Contains(t, stdout.String(), "entityType: task")
+	require.Contains(t, stdout.String(), "actorLabel: alice")
+}
+
+func TestRunListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listUnifiedFn: func(ctx context.Context, projectID, entityType, status, priority, sortSpec string, limit int) (domain.ListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "epic,task", entityType)
+				require.Equal(t, "todo", status)
+				require.Equal(t, "0,1", priority)
+				require.Equal(t, "priority:asc,created:desc", sortSpec)
+				require.Equal(t, 2, limit)
+				return domain.ListResponse{
+					ProjectID: "default",
+					Items: []domain.UnifiedListItem{
+						{
+							EntityType: "epic",
+							ID:         "EPIC-1",
+							Title:      "Track auth",
+							Status:     domain.StatusTodo,
+							Priority:   domain.PriorityCritical,
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"list", "--type", "epic,task", "--status", "todo", "--priority", "0,1", "--sort", "priority:asc,created:desc", "--limit", "2"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "list[1]:")
+	require.Contains(t, stdout.String(), "- id: EPIC-1")
+	require.Contains(t, stdout.String(), "entityType: epic")
+	require.Contains(t, stdout.String(), `title: "Track auth"`)
 }
 
 func TestRunInitWritesLocalConfig(t *testing.T) {

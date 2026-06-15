@@ -46,7 +46,7 @@ Local `.phatodo/` data should stay limited to client config and optional cache d
 
 ### Phase 2
 
-- Fill out read APIs for list/show/search/history.
+- Fill out the remaining read APIs for epics and locks.
 - Add repository implementations for projects, epics, tasks, comments, and dependencies.
 - Make output formatting consistent across commands.
 

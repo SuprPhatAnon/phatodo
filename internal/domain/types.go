@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Status string
 
@@ -209,6 +212,67 @@ type DependencyListResponse struct {
 	ProjectID string       `json:"project_id"`
 	TaskID    string       `json:"task_id"`
 	Items     []Dependency `json:"items"`
+}
+
+type SearchItem struct {
+	EntityType   string    `json:"entity_type"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Content      string    `json:"content,omitempty"`
+	Status       Status    `json:"status,omitempty"`
+	Priority     Priority  `json:"priority,omitempty"`
+	EpicID       string    `json:"epic_id,omitempty"`
+	ParentTaskID string    `json:"parent_task_id,omitempty"`
+	Author       string    `json:"author,omitempty"`
+	Kind         string    `json:"kind,omitempty"`
+	CreatedAt    time.Time `json:"created_at,omitempty"`
+	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+}
+
+type SearchResponse struct {
+	ProjectID string       `json:"project_id"`
+	Query     string       `json:"query"`
+	Items     []SearchItem `json:"items"`
+}
+
+type UnifiedListItem struct {
+	EntityType   string    `json:"entity_type"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Status       Status    `json:"status,omitempty"`
+	Priority     Priority  `json:"priority,omitempty"`
+	EpicID       string    `json:"epic_id,omitempty"`
+	ParentTaskID string    `json:"parent_task_id,omitempty"`
+	Tags         []string  `json:"tags,omitempty"`
+	CreatedAt    time.Time `json:"created_at,omitempty"`
+	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+}
+
+type ListResponse struct {
+	ProjectID string            `json:"project_id"`
+	Items     []UnifiedListItem `json:"items"`
+}
+
+type HistoryEvent struct {
+	ID          int64           `json:"id"`
+	WorkspaceID string          `json:"workspace_id,omitempty"`
+	ProjectID   string          `json:"project_id,omitempty"`
+	Action      string          `json:"action"`
+	EntityType  string          `json:"entity_type"`
+	EntityID    string          `json:"entity_id"`
+	ActorUserID string          `json:"actor_user_id,omitempty"`
+	ActorLabel  string          `json:"actor_label,omitempty"`
+	BeforeState json.RawMessage `json:"before_state,omitempty"`
+	AfterState  json.RawMessage `json:"after_state,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt   time.Time       `json:"created_at,omitempty"`
+}
+
+type HistoryResponse struct {
+	ProjectID string         `json:"project_id"`
+	Items     []HistoryEvent `json:"items"`
 }
 
 type ProjectConfig struct {

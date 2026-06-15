@@ -204,3 +204,80 @@ func writeDependency(w io.Writer, indent int, item domain.Dependency) {
 	writeTOONField(w, indent+1, "dependsOnId", item.DependsOnID)
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
 }
+
+func writeSearchItem(w io.Writer, indent int, item domain.SearchItem) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "entityType", item.EntityType)
+	if item.Title != "" {
+		writeTOONField(w, indent+1, "title", item.Title)
+	}
+	if item.Description != "" {
+		writeTOONField(w, indent+1, "description", item.Description)
+	}
+	if item.Content != "" {
+		writeTOONField(w, indent+1, "content", item.Content)
+	}
+	if item.Status != "" {
+		writeTOONField(w, indent+1, "status", string(item.Status))
+	}
+	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
+	if item.EpicID != "" {
+		writeTOONField(w, indent+1, "epicId", item.EpicID)
+	}
+	if item.ParentTaskID != "" {
+		writeTOONField(w, indent+1, "parentTaskId", item.ParentTaskID)
+	}
+	if item.Author != "" {
+		writeTOONField(w, indent+1, "author", item.Author)
+	}
+	if item.Kind != "" {
+		writeTOONField(w, indent+1, "kind", item.Kind)
+	}
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
+}
+
+func writeHistoryEvent(w io.Writer, indent int, item domain.HistoryEvent) {
+	writeTOONListItemStart(w, indent, "id", strconv.FormatInt(item.ID, 10))
+	writeTOONField(w, indent+1, "entityType", item.EntityType)
+	writeTOONField(w, indent+1, "entityId", item.EntityID)
+	writeTOONField(w, indent+1, "action", item.Action)
+	if item.ActorLabel != "" {
+		writeTOONField(w, indent+1, "actorLabel", item.ActorLabel)
+	}
+	if item.ActorUserID != "" {
+		writeTOONField(w, indent+1, "actorUserId", item.ActorUserID)
+	}
+	if len(item.BeforeState) > 0 {
+		writeTOONQuotedField(w, indent+1, "beforeState", string(item.BeforeState))
+	}
+	if len(item.AfterState) > 0 {
+		writeTOONQuotedField(w, indent+1, "afterState", string(item.AfterState))
+	}
+	if len(item.Metadata) > 0 {
+		writeTOONQuotedField(w, indent+1, "metadata", string(item.Metadata))
+	}
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+}
+
+func writeUnifiedListItem(w io.Writer, indent int, item domain.UnifiedListItem) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "entityType", item.EntityType)
+	writeTOONField(w, indent+1, "title", item.Title)
+	writeTOONField(w, indent+1, "description", item.Description)
+	if item.Status != "" {
+		writeTOONField(w, indent+1, "status", string(item.Status))
+	}
+	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
+	if item.EpicID != "" {
+		writeTOONField(w, indent+1, "epicId", item.EpicID)
+	}
+	if item.ParentTaskID != "" {
+		writeTOONField(w, indent+1, "parentTaskId", item.ParentTaskID)
+	}
+	if len(item.Tags) > 0 {
+		writeTOONQuotedField(w, indent+1, "tags", strings.Join(item.Tags, ","))
+	}
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
+}

@@ -25,6 +25,9 @@ type Config struct {
 	DependencyLister    DependencyLister
 	DependencyAdder     DependencyAdder
 	DependencyRemover   DependencyRemover
+	Searcher            Searcher
+	Historian           Historian
+	ListLister          ListLister
 	ReadyLister         ReadyLister
 	BootstrapManager    BootstrapManager
 }
@@ -89,6 +92,18 @@ type DependencyAdder interface {
 
 type DependencyRemover interface {
 	RemoveDependency(context.Context, string, string, string, string) (domain.Dependency, error)
+}
+
+type Searcher interface {
+	Search(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
+}
+
+type Historian interface {
+	History(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
+}
+
+type ListLister interface {
+	ListUnified(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
 }
 
 type ReadyLister interface {

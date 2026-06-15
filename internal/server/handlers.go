@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -414,6 +415,91 @@ func (a *app) removeDependency(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
+func (a *app) search(w http.ResponseWriter, r *http.Request) {
+	if a.config.Searcher == nil {
+		respondError(w, http.StatusServiceUnavailable, "search_store_unavailable", "search store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		respondError(w, http.StatusBadRequest, "invalid_request", "search query is required")
+		return
+	}
+
+	entityType := strings.TrimSpace(r.URL.Query().Get("type"))
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 20)
+
+	result, err := a.config.Searcher.Search(r.Context(), projectID, query, entityType, status, limit)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "search_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) history(w http.ResponseWriter, r *http.Request) {
+	if a.config.Historian == nil {
+		respondError(w, http.StatusServiceUnavailable, "history_store_unavailable", "history store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	entityID := strings.TrimSpace(r.URL.Query().Get("entity"))
+	entityType := strings.TrimSpace(r.URL.Query().Get("type"))
+	action := strings.TrimSpace(r.URL.Query().Get("action"))
+	since := strings.TrimSpace(r.URL.Query().Get("since"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 50)
+
+	result, err := a.config.Historian.History(r.Context(), projectID, entityID, entityType, action, since, limit)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "history_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) listUnified(w http.ResponseWriter, r *http.Request) {
+	if a.config.ListLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "list_store_unavailable", "list store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	entityType := strings.TrimSpace(r.URL.Query().Get("type"))
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	priority := strings.TrimSpace(r.URL.Query().Get("priority"))
+	sortSpec := strings.TrimSpace(r.URL.Query().Get("sort"))
+	limit := parseQueryLimit(r.URL.Query().Get("limit"), 50)
+
+	result, err := a.config.ListLister.ListUnified(r.Context(), projectID, entityType, status, priority, sortSpec, limit)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 func (a *app) showTask(w http.ResponseWriter, r *http.Request) {
 	if a.config.TaskReader == nil {
 		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
@@ -775,6 +861,17 @@ func decodeDependencyPair(body io.Reader) (string, error) {
 		return "", errors.New("depends_on_id is required")
 	}
 	return req.DependsOnID, nil
+}
+
+func parseQueryLimit(value string, fallback int) int {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	var limit int
+	if _, err := fmt.Sscanf(value, "%d", &limit); err != nil || limit <= 0 {
+		return fallback
+	}
+	return limit
 }
 
 func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {

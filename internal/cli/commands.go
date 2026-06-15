@@ -106,6 +106,15 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "dep" && args[1] == "list" {
 		return runDepList(args[2:], stdout, stderr)
 	}
+	if len(args) >= 1 && args[0] == "search" {
+		return runSearch(args[1:], stdout, stderr)
+	}
+	if len(args) >= 1 && args[0] == "history" {
+		return runHistory(args[1:], stdout, stderr)
+	}
+	if len(args) >= 1 && args[0] == "list" {
+		return runList(args[1:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "task" && args[1] == "show" {
 		return runTaskShow(args[2:], stdout, stderr)
 	}
@@ -1270,6 +1279,212 @@ func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
 	writeTOONArrayHeader(stdout, 0, "ready", len(resp.Items))
 	for _, item := range resp.Items {
 		writeReadyListItem(stdout, 1, item)
+	}
+	return 0
+}
+
+type searchOptions struct {
+	query      string
+	entityType string
+	status     string
+	limit      int
+}
+
+func parseSearchArgs(args []string) (searchOptions, error) {
+	fs := flag.NewFlagSet("search", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts searchOptions
+	fs.StringVar(&opts.entityType, "type", "", "")
+	fs.StringVar(&opts.status, "status", "", "")
+	fs.IntVar(&opts.limit, "limit", 20, "")
+
+	if len(args) == 0 {
+		return searchOptions{}, fmt.Errorf("search requires <query>")
+	}
+	opts.query = args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return searchOptions{}, fmt.Errorf("invalid search flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return searchOptions{}, fmt.Errorf("search does not accept positional arguments after <query>")
+	}
+	if strings.TrimSpace(opts.query) == "" {
+		return searchOptions{}, fmt.Errorf("search requires <query>")
+	}
+
+	return opts, nil
+}
+
+type historyOptions struct {
+	entityID   string
+	entityType string
+	action     string
+	since      string
+	limit      int
+}
+
+func parseHistoryArgs(args []string) (historyOptions, error) {
+	fs := flag.NewFlagSet("history", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts historyOptions
+	fs.StringVar(&opts.entityID, "entity", "", "")
+	fs.StringVar(&opts.entityType, "type", "", "")
+	fs.StringVar(&opts.action, "action", "", "")
+	fs.StringVar(&opts.since, "since", "", "")
+	fs.IntVar(&opts.limit, "limit", 50, "")
+
+	if err := fs.Parse(args); err != nil {
+		return historyOptions{}, fmt.Errorf("invalid history flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return historyOptions{}, fmt.Errorf("history does not accept positional arguments")
+	}
+
+	return opts, nil
+}
+
+type listOptions struct {
+	entityType string
+	status     string
+	priority   string
+	sortSpec   string
+	limit      int
+}
+
+func parseListArgs(args []string) (listOptions, error) {
+	fs := flag.NewFlagSet("list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts listOptions
+	fs.StringVar(&opts.entityType, "type", "", "")
+	fs.StringVar(&opts.status, "status", "", "")
+	fs.StringVar(&opts.priority, "priority", "", "")
+	fs.StringVar(&opts.sortSpec, "sort", "", "")
+	fs.IntVar(&opts.limit, "limit", 50, "")
+
+	if err := fs.Parse(args); err != nil {
+		return listOptions{}, fmt.Errorf("invalid list flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return listOptions{}, fmt.Errorf("list does not accept positional arguments")
+	}
+
+	return opts, nil
+}
+
+func runSearch(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseSearchArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.Search(context.Background(), cfg.ProjectID, opts.query, opts.entityType, opts.status, opts.limit)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "search", len(resp.Items))
+	for _, item := range resp.Items {
+		writeSearchItem(stdout, 1, item)
+	}
+	return 0
+}
+
+func runHistory(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseHistoryArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.History(context.Background(), cfg.ProjectID, opts.entityID, opts.entityType, opts.action, opts.since, opts.limit)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "history", len(resp.Items))
+	for _, item := range resp.Items {
+		writeHistoryEvent(stdout, 1, item)
+	}
+	return 0
+}
+
+func runList(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseListArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListUnified(context.Background(), cfg.ProjectID, opts.entityType, opts.status, opts.priority, opts.sortSpec, opts.limit)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "list", len(resp.Items))
+	for _, item := range resp.Items {
+		writeUnifiedListItem(stdout, 1, item)
 	}
 	return 0
 }

@@ -156,6 +156,41 @@ dependencies[1]:
     dependsOnId: ABC-2
 ```
 
+### Search, History, List
+
+`ptodo search "auth bug" --type task --status todo --limit 10`:
+
+```text
+search[1]:
+  - id: ABC-1
+    entityType: task
+    title: "Fix auth bug"
+    status: todo
+    priority: 1
+```
+
+`ptodo history --entity ABC-1 --type task --action update --since 2025-01-01 --limit 5`:
+
+```text
+history[1]:
+  - id: 42
+    entityType: task
+    entityId: ABC-1
+    action: update
+    actorLabel: alice
+```
+
+`ptodo list --type epic,task --status todo --priority 0,1 --sort priority:asc,created:desc --limit 2`:
+
+```text
+list[1]:
+  - id: EPIC-1
+    entityType: epic
+    title: "Track auth"
+    status: todo
+    priority: 0
+```
+
 ### Locks
 
 Render:

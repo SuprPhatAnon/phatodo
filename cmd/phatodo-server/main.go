@@ -35,6 +35,9 @@ func main() {
 	var dependencyLister server.DependencyLister
 	var dependencyAdder server.DependencyAdder
 	var dependencyRemover server.DependencyRemover
+	var searcher server.Searcher
+	var historian server.Historian
+	var listLister server.ListLister
 	var readyLister server.ReadyLister
 	var bootstrapManager server.BootstrapManager
 	if postgresDSN != "" {
@@ -59,6 +62,9 @@ func main() {
 		dependencyLister = store
 		dependencyAdder = store
 		dependencyRemover = store
+		searcher = store
+		historian = store
+		listLister = store
 		readyLister = store
 		bootstrapManager = store
 	}
@@ -81,6 +87,9 @@ func main() {
 		DependencyLister:    dependencyLister,
 		DependencyAdder:     dependencyAdder,
 		DependencyRemover:   dependencyRemover,
+		Searcher:            searcher,
+		Historian:           historian,
+		ListLister:          listLister,
 		ReadyLister:         readyLister,
 		BootstrapManager:    bootstrapManager,
 	})
