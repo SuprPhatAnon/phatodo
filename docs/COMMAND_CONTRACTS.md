@@ -548,6 +548,7 @@ Expected body fields:
 - `entity_id`
 - `reason`
 - `expires_at` or `ttl`
+- returns the acquired lock row with server-generated `lock_id`, `leased_at`, and `expires_at`
 
 ### `ptodo lock release`
 
@@ -556,6 +557,7 @@ Required input:
 
 Server request:
 - `DELETE /api/v1/projects/{projectID}/locks/{lockID}`
+- returns the released lock row; releasing an already released lock should be a no-op
 
 ### `ptodo lock list`
 
@@ -566,6 +568,7 @@ Optional filters:
 
 Server request:
 - `GET /api/v1/projects/{projectID}/locks`
+- returns a lock list with optional filtering by entity type, entity ID, and active status
 
 ## Output Contract
 

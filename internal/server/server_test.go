@@ -36,7 +36,7 @@ func TestAPIRoutesRequireCredentials(t *testing.T) {
 	}
 }
 
-func TestAPIRouteScaffoldReturnsAction(t *testing.T) {
+func TestEpicListReturnsUnavailableWithoutStore(t *testing.T) {
 	handler := newApp(Config{}).routes()
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/epics", nil)
@@ -45,19 +45,19 @@ func TestAPIRouteScaffoldReturnsAction(t *testing.T) {
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNotImplemented {
-		t.Fatalf("expected 501, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected 503, got %d: %s", rec.Code, rec.Body.String())
 	}
 
 	var body map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["action"] != "epic.list" {
-		t.Fatalf("expected epic.list action, got %#v", body["action"])
+	if body["error"] != "epic_store_unavailable" {
+		t.Fatalf("expected epic_store_unavailable, got %#v", body["error"])
 	}
-	if body["project_id"] != "project-1" {
-		t.Fatalf("expected project id, got %#v", body["project_id"])
+	if body["message"] != "epic store is not configured" {
+		t.Fatalf("expected epic store message, got %#v", body["message"])
 	}
 }
 

@@ -22,6 +22,7 @@ func (a *app) routes() http.Handler {
 	a.registerTaskRoutes(mux)
 	a.registerCommentRoutes(mux)
 	a.registerDependencyRoutes(mux)
+	a.registerLockRoutes(mux)
 	a.registerConfigRoutes(mux)
 	a.registerQueryRoutes(mux)
 
@@ -44,12 +45,12 @@ func (a *app) registerProjectRoutes(mux *http.ServeMux) {
 }
 
 func (a *app) registerEpicRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/epics", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.list"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/epics", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.create"))))
-	mux.Handle("GET /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.show"))))
-	mux.Handle("PATCH /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.update"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/epics/{epicID}/complete", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.complete"))))
-	mux.Handle("DELETE /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("epic.delete"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/epics", a.withAPIAuth(http.HandlerFunc(a.listEpics)))
+	mux.Handle("POST /api/v1/projects/{projectID}/epics", a.withAPIAuth(http.HandlerFunc(a.createEpic)))
+	mux.Handle("GET /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.showEpic)))
+	mux.Handle("PATCH /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.updateEpic)))
+	mux.Handle("POST /api/v1/projects/{projectID}/epics/{epicID}/complete", a.withAPIAuth(http.HandlerFunc(a.completeEpic)))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/epics/{epicID}", a.withAPIAuth(http.HandlerFunc(a.deleteEpic)))
 }
 
 func (a *app) registerTaskRoutes(mux *http.ServeMux) {
@@ -73,6 +74,12 @@ func (a *app) registerDependencyRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.listDependencies)))
 	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies", a.withAPIAuth(http.HandlerFunc(a.addDependency)))
 	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}", a.withAPIAuth(http.HandlerFunc(a.removeDependency)))
+}
+
+func (a *app) registerLockRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /api/v1/projects/{projectID}/locks", a.withAPIAuth(http.HandlerFunc(a.listLocks)))
+	mux.Handle("POST /api/v1/projects/{projectID}/locks", a.withAPIAuth(http.HandlerFunc(a.acquireLock)))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/locks/{lockID}", a.withAPIAuth(http.HandlerFunc(a.releaseLock)))
 }
 
 func (a *app) registerConfigRoutes(mux *http.ServeMux) {

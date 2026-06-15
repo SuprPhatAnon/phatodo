@@ -10,12 +10,12 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [x] `ptodo config get`
 - [x] `ptodo config set`
 - [x] `ptodo config unset`
-- [ ] `ptodo epic create`
-- [ ] `ptodo epic list`
-- [ ] `ptodo epic show`
-- [ ] `ptodo epic update`
-- [ ] `ptodo epic complete`
-- [ ] `ptodo epic delete`
+- [x] `ptodo epic create`
+- [x] `ptodo epic list`
+- [x] `ptodo epic show`
+- [x] `ptodo epic update`
+- [x] `ptodo epic complete`
+- [x] `ptodo epic delete`
 - [x] `ptodo task create`
 - [x] `ptodo task list`
 - [x] `ptodo task show`
@@ -33,9 +33,9 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [x] `ptodo dep remove`
 - [x] `ptodo dep list`
 - [x] `ptodo ready`
-- [ ] `ptodo lock acquire`
-- [ ] `ptodo lock release`
-- [ ] `ptodo lock list`
+- [x] `ptodo lock acquire`
+- [x] `ptodo lock release`
+- [x] `ptodo lock list`
 - [x] `ptodo search`
 - [x] `ptodo history`
 - [x] `ptodo list`

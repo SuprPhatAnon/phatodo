@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/SuprPhatAnon/phatodo/internal/config"
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
@@ -24,6 +25,7 @@ var commandGroups = []struct {
 	{"subtask", []string{"subtask create", "subtask list", "subtask update", "subtask delete"}},
 	{"comment", []string{"comment add", "comment list", "comment update", "comment delete"}},
 	{"dep", []string{"dep add", "dep remove", "dep list"}},
+	{"lock", []string{"lock acquire", "lock release", "lock list"}},
 	{"workflow", []string{"ready"}},
 	{"config", []string{"config list", "config get", "config set", "config unset"}},
 	{"query", []string{"search", "history", "list"}},
@@ -70,6 +72,24 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "config" && args[1] == "unset" {
 		return runConfigUnset(args[2:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "create" {
+		return runEpicCreate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "list" {
+		return runEpicList(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "show" {
+		return runEpicShow(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "update" {
+		return runEpicUpdate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "complete" {
+		return runEpicComplete(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "epic" && args[1] == "delete" {
+		return runEpicDelete(args[2:], stdout, stderr)
+	}
 	if len(args) >= 1 && args[0] == "ready" {
 		return runReady(args[1:], stdout, stderr)
 	}
@@ -105,6 +125,15 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	if len(args) >= 2 && args[0] == "dep" && args[1] == "list" {
 		return runDepList(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "lock" && args[1] == "acquire" {
+		return runLockAcquire(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "lock" && args[1] == "release" {
+		return runLockRelease(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "lock" && args[1] == "list" {
+		return runLockList(args[2:], stdout, stderr)
 	}
 	if len(args) >= 1 && args[0] == "search" {
 		return runSearch(args[1:], stdout, stderr)
@@ -297,6 +326,421 @@ func runConfigUnset(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 
 	writeProjectConfigItem(stdout, item)
+	return 0
+}
+
+type epicCreateOptions struct {
+	title              string
+	description        string
+	priority           int
+	assignedTo         string
+	acceptanceCriteria []string
+}
+
+func parseEpicCreateArgs(args []string) (epicCreateOptions, error) {
+	fs := flag.NewFlagSet("epic create", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var title string
+	var description string
+	var assignedTo string
+	var criteriaJSON string
+	priority := int(domain.PriorityMedium)
+
+	fs.StringVar(&title, "t", "", "")
+	fs.StringVar(&title, "title", "", "")
+	fs.StringVar(&description, "d", "", "")
+	fs.StringVar(&description, "description", "", "")
+	fs.IntVar(&priority, "p", int(domain.PriorityMedium), "")
+	fs.IntVar(&priority, "priority", int(domain.PriorityMedium), "")
+	fs.StringVar(&assignedTo, "a", "", "")
+	fs.StringVar(&assignedTo, "assigned-to", "", "")
+	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
+
+	if err := fs.Parse(args); err != nil {
+		return epicCreateOptions{}, fmt.Errorf("invalid epic create flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return epicCreateOptions{}, fmt.Errorf("epic create does not accept positional arguments")
+	}
+	if title == "" {
+		return epicCreateOptions{}, fmt.Errorf("epic create requires -t <title>")
+	}
+
+	criteria, err := parseJSONStringList(criteriaJSON)
+	if err != nil {
+		return epicCreateOptions{}, err
+	}
+
+	return epicCreateOptions{
+		title:              title,
+		description:        description,
+		priority:           priority,
+		assignedTo:         assignedTo,
+		acceptanceCriteria: criteria,
+	}, nil
+}
+
+type epicUpdateOptions struct {
+	epicID          string
+	title           string
+	description     string
+	priority        int
+	status          string
+	assignedTo      string
+	criteriaJSON    string
+	summary         string
+	evidenceJSON    string
+	hasTitle        bool
+	hasDescription  bool
+	hasPriority     bool
+	hasStatus       bool
+	hasAssignedTo   bool
+	hasCriteriaJSON bool
+	hasSummary      bool
+	hasEvidenceJSON bool
+}
+
+func parseEpicUpdateArgs(args []string) (epicUpdateOptions, error) {
+	fs := flag.NewFlagSet("epic update", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts epicUpdateOptions
+	fs.StringVar(&opts.title, "t", "", "")
+	fs.StringVar(&opts.title, "title", "", "")
+	fs.StringVar(&opts.description, "d", "", "")
+	fs.StringVar(&opts.description, "description", "", "")
+	fs.IntVar(&opts.priority, "p", int(domain.PriorityMedium), "")
+	fs.IntVar(&opts.priority, "priority", int(domain.PriorityMedium), "")
+	fs.StringVar(&opts.status, "s", "", "")
+	fs.StringVar(&opts.status, "status", "", "")
+	fs.StringVar(&opts.assignedTo, "a", "", "")
+	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
+	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
+	fs.StringVar(&opts.summary, "summary", "", "")
+	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
+
+	if len(args) == 0 {
+		return epicUpdateOptions{}, fmt.Errorf("epic update requires <epic-id>")
+	}
+	opts.epicID = args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return epicUpdateOptions{}, fmt.Errorf("invalid epic update flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return epicUpdateOptions{}, fmt.Errorf("epic update does not accept positional arguments after <epic-id>")
+	}
+
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "t", "title":
+			opts.hasTitle = true
+		case "d", "description":
+			opts.hasDescription = true
+		case "p", "priority":
+			opts.hasPriority = true
+		case "s", "status":
+			opts.hasStatus = true
+		case "a", "assigned-to":
+			opts.hasAssignedTo = true
+		case "criteria-json":
+			opts.hasCriteriaJSON = true
+		case "summary":
+			opts.hasSummary = true
+		case "evidence-json":
+			opts.hasEvidenceJSON = true
+		}
+	})
+
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasAssignedTo && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+		return epicUpdateOptions{}, fmt.Errorf("epic update requires at least one change flag")
+	}
+	if opts.hasStatus && !isAllowedEpicStatus(opts.status) {
+		return epicUpdateOptions{}, fmt.Errorf("epic update status must be todo, in_progress, completed, or archived")
+	}
+
+	return opts, nil
+}
+
+type epicListOptions struct {
+	status string
+}
+
+func parseEpicListArgs(args []string) (epicListOptions, error) {
+	fs := flag.NewFlagSet("epic list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var status string
+	fs.StringVar(&status, "status", "", "")
+
+	if err := fs.Parse(args); err != nil {
+		return epicListOptions{}, fmt.Errorf("invalid epic list flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return epicListOptions{}, fmt.Errorf("epic list does not accept positional arguments")
+	}
+	if status != "" && !isAllowedEpicStatus(status) {
+		return epicListOptions{}, fmt.Errorf("epic list status must be todo, in_progress, completed, or archived")
+	}
+
+	return epicListOptions{status: status}, nil
+}
+
+func runEpicCreate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseEpicCreateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	priority := domain.Priority(opts.priority)
+	req := domain.EpicCreateRequest{
+		Title:              opts.title,
+		Description:        opts.description,
+		Priority:           &priority,
+		AssignedTo:         opts.assignedTo,
+		AcceptanceCriteria: opts.acceptanceCriteria,
+	}
+
+	resp, err := client.CreateEpic(context.Background(), cfg.ProjectID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeEpic(stdout, 0, resp)
+	return 0
+}
+
+func runEpicList(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseEpicListArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListEpics(context.Background(), cfg.ProjectID, opts.status)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "epics", len(resp.Items))
+	for _, item := range resp.Items {
+		writeEpic(stdout, 1, item)
+	}
+	return 0
+}
+
+func runEpicShow(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo epic show <epic-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.GetEpic(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeEpic(stdout, 0, resp)
+	return 0
+}
+
+func runEpicUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseEpicUpdateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	req := domain.EpicUpdateRequest{}
+	if opts.hasTitle {
+		req.Title = &opts.title
+	}
+	if opts.hasDescription {
+		req.Description = &opts.description
+	}
+	if opts.hasPriority {
+		priority := domain.Priority(opts.priority)
+		req.Priority = &priority
+	}
+	if opts.hasStatus {
+		status := domain.Status(opts.status)
+		req.Status = &status
+	}
+	if opts.hasAssignedTo {
+		req.AssignedTo = &opts.assignedTo
+	}
+	if opts.hasCriteriaJSON {
+		criteria, err := parseJSONStringList(opts.criteriaJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.AcceptanceCriteria = &criteria
+	}
+	if opts.hasSummary {
+		req.CompletionSummary = &opts.summary
+	}
+	if opts.hasEvidenceJSON {
+		evidence, err := parseJSONStringList(opts.evidenceJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.CompletionEvidence = &evidence
+	}
+
+	resp, err := client.UpdateEpic(context.Background(), cfg.ProjectID, opts.epicID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeEpic(stdout, 0, resp)
+	return 0
+}
+
+func runEpicComplete(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo epic complete <epic-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.CompleteEpic(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeEpic(stdout, 0, resp)
+	return 0
+}
+
+func runEpicDelete(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo epic delete <epic-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.DeleteEpic(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeEpic(stdout, 0, resp)
 	return 0
 }
 
@@ -935,6 +1379,189 @@ func runDepList(args []string, stdout io.Writer, stderr io.Writer) int {
 	writeTOONArrayHeader(stdout, 0, "dependencies", len(resp.Items))
 	for _, item := range resp.Items {
 		writeDependency(stdout, 1, item)
+	}
+	return 0
+}
+
+type lockAcquireOptions struct {
+	entityType string
+	entityID   string
+	reason     string
+	expires    string
+}
+
+func parseLockAcquireArgs(args []string) (lockAcquireOptions, error) {
+	fs := flag.NewFlagSet("lock acquire", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts lockAcquireOptions
+	fs.StringVar(&opts.reason, "reason", "", "")
+	fs.StringVar(&opts.expires, "expires", "", "")
+
+	if len(args) < 2 {
+		return lockAcquireOptions{}, fmt.Errorf("lock acquire requires <entity-type> <entity-id>")
+	}
+	opts.entityType = args[0]
+	opts.entityID = args[1]
+
+	if err := fs.Parse(args[2:]); err != nil {
+		return lockAcquireOptions{}, fmt.Errorf("invalid lock acquire flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return lockAcquireOptions{}, fmt.Errorf("lock acquire does not accept positional arguments after <entity-id>")
+	}
+	if !isAllowedLockEntityType(opts.entityType) {
+		return lockAcquireOptions{}, fmt.Errorf("lock acquire entity type must be epic, task, or subtask")
+	}
+	if opts.expires != "" {
+		if _, err := time.ParseDuration(opts.expires); err != nil {
+			return lockAcquireOptions{}, fmt.Errorf("invalid lock acquire expires duration: %w", err)
+		}
+	}
+	return opts, nil
+}
+
+type lockListOptions struct {
+	entityTypes string
+	entityID    string
+	active      bool
+}
+
+func parseLockListArgs(args []string) (lockListOptions, error) {
+	fs := flag.NewFlagSet("lock list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts lockListOptions
+	fs.StringVar(&opts.entityTypes, "type", "", "")
+	fs.StringVar(&opts.entityID, "entity", "", "")
+	fs.BoolVar(&opts.active, "active", false, "")
+
+	if err := fs.Parse(args); err != nil {
+		return lockListOptions{}, fmt.Errorf("invalid lock list flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return lockListOptions{}, fmt.Errorf("lock list does not accept positional arguments")
+	}
+	if opts.entityTypes != "" {
+		for _, entityType := range strings.Split(opts.entityTypes, ",") {
+			if !isAllowedLockEntityType(strings.TrimSpace(entityType)) {
+				return lockListOptions{}, fmt.Errorf("lock list type must be epic, task, or subtask")
+			}
+		}
+	}
+	return opts, nil
+}
+
+func runLockAcquire(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseLockAcquireArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	req := domain.LockAcquireRequest{
+		EntityType: opts.entityType,
+		EntityID:   opts.entityID,
+		Reason:     opts.reason,
+		TTL:        opts.expires,
+	}
+
+	resp, err := client.AcquireLock(context.Background(), cfg.ProjectID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeLock(stdout, 0, resp)
+	return 0
+}
+
+func runLockRelease(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo lock release <lock-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ReleaseLock(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeLock(stdout, 0, resp)
+	return 0
+}
+
+func runLockList(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseLockListArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListLocks(context.Background(), cfg.ProjectID, opts.entityTypes, opts.entityID, opts.active)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "locks", len(resp.Items))
+	for _, item := range resp.Items {
+		writeLock(stdout, 1, item)
 	}
 	return 0
 }
@@ -1644,6 +2271,24 @@ func parseJSONStringList(value string) ([]string, error) {
 func isAllowedTaskStatus(value string) bool {
 	switch domain.Status(value) {
 	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedEpicStatus(value string) bool {
+	switch domain.Status(value) {
+	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedLockEntityType(value string) bool {
+	switch strings.TrimSpace(value) {
+	case "epic", "task", "subtask":
 		return true
 	default:
 		return false

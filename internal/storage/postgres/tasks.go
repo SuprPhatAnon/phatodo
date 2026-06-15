@@ -375,6 +375,10 @@ func (s *Store) DeleteTask(ctx context.Context, projectID string, taskID string,
 		return domain.TaskDetail{}, err
 	}
 
+	if err := s.releaseEntityLocksTx(ctx, tx, projectID, taskEntityType(before.ParentTaskID), taskID, actorUserID); err != nil {
+		return domain.TaskDetail{}, err
+	}
+
 	taskRow, err := q.DeleteTask(ctx, db.DeleteTaskParams{ProjectID: projectID, TaskID: taskID})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

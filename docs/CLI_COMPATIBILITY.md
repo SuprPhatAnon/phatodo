@@ -10,6 +10,7 @@ The `ptodo` executable should keep the command shape preserved in `docs/trekker_
 - Subtasks: `subtask create`, `subtask list`, `subtask update`, `subtask delete`
 - Comments: `comment add`, `comment list`, `comment update`, `comment delete`
 - Dependencies: `dep add`, `dep remove`, `dep list`
+- Locks: `lock acquire`, `lock release`, `lock list`
 - Workflow: `ready`
 - Config: `config list`, `config get`, `config set`, `config unset`
 - Query: `search`, `history`, `list`
@@ -29,7 +30,6 @@ The Trekker-compatible command surface is extended to cover schema-backed fields
 - `--criteria-json` for acceptance criteria
 - `--summary` and `--evidence-json` for completion metadata
 - `-k/--kind` for comment type
-- `lock acquire`, `lock release`, and `lock list` for `work_item_locks`
 
 ## Client Configuration
 

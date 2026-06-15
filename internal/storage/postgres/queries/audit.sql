@@ -44,13 +44,6 @@ WHERE project_id = sqlc.arg(project_id)
   )
 ORDER BY created_at DESC, id ASC;
 
--- name: ListEpics :many
-SELECT id, title, COALESCE(description, ''), status, priority, created_at, updated_at
-FROM epics
-WHERE project_id = sqlc.arg(project_id)
-  AND (sqlc.arg(status) = '' OR status = sqlc.arg(status))
-ORDER BY created_at ASC, id ASC;
-
 -- name: ListTasksUnified :many
 SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks

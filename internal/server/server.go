@@ -12,6 +12,15 @@ type Config struct {
 	PostgresDSN         string
 	ProjectConfigReader ProjectConfigReader
 	ProjectConfigWriter ProjectConfigWriter
+	EpicLister          EpicLister
+	EpicReader          EpicReader
+	EpicCreator         EpicCreator
+	EpicUpdater         EpicUpdater
+	EpicCompleter       EpicCompleter
+	EpicDeleter         EpicDeleter
+	LockLister          LockLister
+	LockAcquirer        LockAcquirer
+	LockReleaser        LockReleaser
 	TaskCreator         TaskCreator
 	TaskLister          TaskLister
 	SubtaskLister       SubtaskLister
@@ -40,6 +49,30 @@ type ProjectConfigReader interface {
 type ProjectConfigWriter interface {
 	SetProjectConfig(context.Context, string, string, string) (domain.ProjectConfig, error)
 	DeleteProjectConfig(context.Context, string, string) (domain.ProjectConfig, error)
+}
+
+type EpicLister interface {
+	ListEpics(context.Context, string, string) (domain.EpicListResponse, error)
+}
+
+type EpicReader interface {
+	GetEpic(context.Context, string, string) (domain.Epic, error)
+}
+
+type EpicCreator interface {
+	CreateEpic(context.Context, string, domain.EpicCreateRequest, string) (domain.Epic, error)
+}
+
+type EpicUpdater interface {
+	UpdateEpic(context.Context, string, string, domain.EpicUpdateRequest, string) (domain.Epic, error)
+}
+
+type EpicCompleter interface {
+	CompleteEpic(context.Context, string, string, string) (domain.Epic, error)
+}
+
+type EpicDeleter interface {
+	DeleteEpic(context.Context, string, string, string) (domain.Epic, error)
 }
 
 type TaskCreator interface {
@@ -113,6 +146,18 @@ type ReadyLister interface {
 type BootstrapManager interface {
 	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	BootstrapProject(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
+}
+
+type LockLister interface {
+	ListLocks(context.Context, string, []string, string, bool) (domain.LockListResponse, error)
+}
+
+type LockAcquirer interface {
+	AcquireLock(context.Context, string, domain.LockAcquireRequest, string) (domain.WorkItemLock, error)
+}
+
+type LockReleaser interface {
+	ReleaseLock(context.Context, string, string, string) (domain.WorkItemLock, error)
 }
 
 func New(config Config) *http.Server {

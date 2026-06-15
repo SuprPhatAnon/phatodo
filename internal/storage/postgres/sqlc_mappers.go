@@ -110,12 +110,12 @@ func readyDependentFromSQLC(row db.ListReadyDependentsRow) domain.TaskListItem {
 	return item
 }
 
-func unifiedItemFromEpicSQLC(row db.ListEpicsRow) domain.UnifiedListItem {
+func unifiedItemFromEpicSQLC(row db.Epic) domain.UnifiedListItem {
 	return domain.UnifiedListItem{
 		EntityType:  "epic",
 		ID:          row.ID,
 		Title:       row.Title,
-		Description: row.Description,
+		Description: derefString(row.Description),
 		Status:      domain.Status(row.Status),
 		Priority:    domain.Priority(row.Priority),
 		CreatedAt:   row.CreatedAt,
@@ -220,6 +220,24 @@ func historyEventFromSQLC(row db.Event) domain.HistoryEvent {
 	return evt
 }
 
+func lockFromSQLC(row db.WorkItemLock) domain.WorkItemLock {
+	lock := domain.WorkItemLock{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		EntityType:  row.EntityType,
+		EntityID:    row.EntityID,
+		LockedBy:    row.LockedBy,
+		Reason:      derefString(row.Reason),
+		LeasedAt:    row.LeasedAt,
+		ExpiresAt:   row.ExpiresAt,
+	}
+	if row.ReleasedAt.Valid {
+		lock.ReleasedAt = row.ReleasedAt.Time
+	}
+	return lock
+}
+
 func dependencyFromSQLC(row db.Dependency) domain.Dependency {
 	return domain.Dependency{
 		ID:          row.ID,
@@ -229,4 +247,56 @@ func dependencyFromSQLC(row db.Dependency) domain.Dependency {
 		DependsOnID: row.DependsOnID,
 		CreatedAt:   row.CreatedAt,
 	}
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func epicFromSQLC(row db.Epic) (domain.Epic, error) {
+	epic := domain.Epic{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		Title:       row.Title,
+		Status:      domain.Status(row.Status),
+		Priority:    domain.Priority(row.Priority),
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
+	}
+	if row.AssignedTo != nil {
+		epic.AssignedTo = *row.AssignedTo
+	}
+	if row.CreatedBy != nil {
+		epic.CreatedBy = *row.CreatedBy
+	}
+	if row.UpdatedBy != nil {
+		epic.UpdatedBy = *row.UpdatedBy
+	}
+	if row.CompletedBy != nil {
+		epic.CompletedBy = *row.CompletedBy
+	}
+	if row.Description != nil {
+		epic.Description = *row.Description
+	}
+	if row.CompletionSummary != nil {
+		epic.CompletionSummary = *row.CompletionSummary
+	}
+	if row.CompletedAt.Valid {
+		epic.CompletedAt = row.CompletedAt.Time
+	}
+	if len(row.AcceptanceCriteria) > 0 {
+		if err := json.Unmarshal(row.AcceptanceCriteria, &epic.AcceptanceCriteria); err != nil {
+			return domain.Epic{}, err
+		}
+	}
+	if len(row.CompletionEvidence) > 0 {
+		if err := json.Unmarshal(row.CompletionEvidence, &epic.CompletionEvidence); err != nil {
+			return domain.Epic{}, err
+		}
+	}
+	return epic, nil
 }

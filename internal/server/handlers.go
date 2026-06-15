@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
@@ -31,6 +32,7 @@ func (a *app) apiIndex(w http.ResponseWriter, r *http.Request) {
 			"comments",
 			"dependencies",
 			"config",
+			"locks",
 			"search",
 			"history",
 			"list",
@@ -55,6 +57,168 @@ func (a *app) listProjectConfig(w http.ResponseWriter, r *http.Request) {
 		"project_id": projectID,
 		"items":      items,
 	})
+}
+
+func (a *app) listEpics(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	if status != "" && !isAllowedEpicStatus(status) {
+		respondError(w, http.StatusBadRequest, "invalid_status", "status must be todo, in_progress, completed, or archived")
+		return
+	}
+
+	result, err := a.config.EpicLister.ListEpics(r.Context(), projectID, status)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) createEpic(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicCreator == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	req, err := decodeEpicCreateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.EpicCreator.CreateEpic(r.Context(), projectID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_create_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) showEpic(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicReader == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	epicID := r.PathValue("epicID")
+	result, err := a.config.EpicReader.GetEpic(r.Context(), projectID, epicID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_show_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) updateEpic(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicUpdater == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	epicID := r.PathValue("epicID")
+	req, err := decodeEpicUpdateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.EpicUpdater.UpdateEpic(r.Context(), projectID, epicID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_update_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) completeEpic(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicCompleter == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	epicID := r.PathValue("epicID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.EpicCompleter.CompleteEpic(r.Context(), projectID, epicID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_complete_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) deleteEpic(w http.ResponseWriter, r *http.Request) {
+	if a.config.EpicDeleter == nil {
+		respondError(w, http.StatusServiceUnavailable, "epic_store_unavailable", "epic store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	epicID := r.PathValue("epicID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.EpicDeleter.DeleteEpic(r.Context(), projectID, epicID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "epic_delete_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
 }
 
 func (a *app) getProjectConfig(w http.ResponseWriter, r *http.Request) {
@@ -415,6 +579,101 @@ func (a *app) removeDependency(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, result)
 }
 
+func (a *app) listLocks(w http.ResponseWriter, r *http.Request) {
+	if a.config.LockLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "lock_store_unavailable", "lock store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	entityTypes := splitCSVQuery(r.URL.Query().Get("type"))
+	entityID := strings.TrimSpace(r.URL.Query().Get("entity"))
+	active := false
+	if activeRaw := strings.TrimSpace(r.URL.Query().Get("active")); activeRaw != "" {
+		parsed, err := strconv.ParseBool(activeRaw)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_request", "active must be true or false")
+			return
+		}
+		active = parsed
+	}
+
+	result, err := a.config.LockLister.ListLocks(r.Context(), projectID, entityTypes, entityID, active)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "lock_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) acquireLock(w http.ResponseWriter, r *http.Request) {
+	if a.config.LockAcquirer == nil {
+		respondError(w, http.StatusServiceUnavailable, "lock_store_unavailable", "lock store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	req, err := decodeLockAcquireRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.LockAcquirer.AcquireLock(r.Context(), projectID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrLockConflict):
+			respondError(w, http.StatusConflict, "lock_conflict", err.Error())
+		case errors.Is(err, postgres.ErrInvalidLockEntityType):
+			respondError(w, http.StatusBadRequest, "invalid_entity_type", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "lock_acquire_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) releaseLock(w http.ResponseWriter, r *http.Request) {
+	if a.config.LockReleaser == nil {
+		respondError(w, http.StatusServiceUnavailable, "lock_store_unavailable", "lock store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	lockID := r.PathValue("lockID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.LockReleaser.ReleaseLock(r.Context(), projectID, lockID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrLockNotFound):
+			respondError(w, http.StatusNotFound, "lock_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "lock_release_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 func (a *app) search(w http.ResponseWriter, r *http.Request) {
 	if a.config.Searcher == nil {
 		respondError(w, http.StatusServiceUnavailable, "search_store_unavailable", "search store is not configured")
@@ -764,6 +1023,75 @@ func decodeAdminInitRequest(body io.Reader) (domain.AdminInitRequest, error) {
 	return req, nil
 }
 
+func decodeEpicCreateRequest(body io.Reader) (domain.EpicCreateRequest, error) {
+	var payload struct {
+		Title              string   `json:"title"`
+		Description        string   `json:"description"`
+		Priority           *int     `json:"priority"`
+		AssignedTo         string   `json:"assigned_to"`
+		AcceptanceCriteria []string `json:"acceptance_criteria"`
+	}
+	if err := json.NewDecoder(body).Decode(&payload); err != nil {
+		return domain.EpicCreateRequest{}, err
+	}
+	if strings.TrimSpace(payload.Title) == "" {
+		return domain.EpicCreateRequest{}, errors.New("title is required")
+	}
+	req := domain.EpicCreateRequest{
+		Title:              payload.Title,
+		Description:        payload.Description,
+		AssignedTo:         payload.AssignedTo,
+		AcceptanceCriteria: payload.AcceptanceCriteria,
+	}
+	if payload.Priority != nil {
+		priority := domain.Priority(*payload.Priority)
+		req.Priority = &priority
+	}
+	return req, nil
+}
+
+func decodeEpicUpdateRequest(body io.Reader) (domain.EpicUpdateRequest, error) {
+	var payload struct {
+		Title              *string   `json:"title"`
+		Description        *string   `json:"description"`
+		Priority           *int      `json:"priority"`
+		Status             *string   `json:"status"`
+		AssignedTo         *string   `json:"assigned_to"`
+		AcceptanceCriteria *[]string `json:"acceptance_criteria"`
+		CompletionSummary  *string   `json:"completion_summary"`
+		CompletionEvidence *[]string `json:"completion_evidence"`
+	}
+	if err := json.NewDecoder(body).Decode(&payload); err != nil {
+		return domain.EpicUpdateRequest{}, err
+	}
+
+	req := domain.EpicUpdateRequest{
+		Title:              payload.Title,
+		Description:        payload.Description,
+		AssignedTo:         payload.AssignedTo,
+		AcceptanceCriteria: payload.AcceptanceCriteria,
+		CompletionSummary:  payload.CompletionSummary,
+		CompletionEvidence: payload.CompletionEvidence,
+	}
+	if payload.Priority != nil {
+		priority := domain.Priority(*payload.Priority)
+		req.Priority = &priority
+	}
+	if payload.Status != nil {
+		status := domain.Status(strings.TrimSpace(*payload.Status))
+		if !isAllowedEpicStatus(string(status)) {
+			return domain.EpicUpdateRequest{}, errors.New("epic status must be todo, in_progress, completed, or archived")
+		}
+		req.Status = &status
+	}
+
+	if req.Title == nil && req.Description == nil && req.Priority == nil && req.Status == nil && req.AssignedTo == nil && req.AcceptanceCriteria == nil && req.CompletionSummary == nil && req.CompletionEvidence == nil {
+		return domain.EpicUpdateRequest{}, errors.New("epic update requires at least one change")
+	}
+
+	return req, nil
+}
+
 func decodeAdminBootstrapRequest(body io.Reader) (domain.AdminBootstrapRequest, error) {
 	var req domain.AdminBootstrapRequest
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
@@ -863,6 +1191,23 @@ func decodeDependencyPair(body io.Reader) (string, error) {
 	return req.DependsOnID, nil
 }
 
+func decodeLockAcquireRequest(body io.Reader) (domain.LockAcquireRequest, error) {
+	var req domain.LockAcquireRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.LockAcquireRequest{}, err
+	}
+	if strings.TrimSpace(req.EntityType) == "" {
+		return domain.LockAcquireRequest{}, errors.New("entity_type is required")
+	}
+	if strings.TrimSpace(req.EntityID) == "" {
+		return domain.LockAcquireRequest{}, errors.New("entity_id is required")
+	}
+	if req.ExpiresAt == nil && strings.TrimSpace(req.TTL) == "" {
+		req.TTL = "1h"
+	}
+	return req, nil
+}
+
 func parseQueryLimit(value string, fallback int) int {
 	if strings.TrimSpace(value) == "" {
 		return fallback
@@ -872,6 +1217,20 @@ func parseQueryLimit(value string, fallback int) int {
 		return fallback
 	}
 	return limit
+}
+
+func splitCSVQuery(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
 
 func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
@@ -898,6 +1257,15 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 func isAllowedTaskStatus(value string) bool {
 	switch domain.Status(value) {
 	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedEpicStatus(value string) bool {
+	switch domain.Status(value) {
+	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusArchived:
 		return true
 	default:
 		return false

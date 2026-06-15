@@ -111,57 +111,6 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 	return err
 }
 
-const listEpics = `-- name: ListEpics :many
-SELECT id, title, COALESCE(description, ''), status, priority, created_at, updated_at
-FROM epics
-WHERE project_id = $1
-  AND ($2 = '' OR status = $2)
-ORDER BY created_at ASC, id ASC
-`
-
-type ListEpicsParams struct {
-	ProjectID string      `json:"project_id"`
-	Status    interface{} `json:"status"`
-}
-
-type ListEpicsRow struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"`
-	Priority    int32     `json:"priority"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}
-
-func (q *Queries) ListEpics(ctx context.Context, arg ListEpicsParams) ([]ListEpicsRow, error) {
-	rows, err := q.db.Query(ctx, listEpics, arg.ProjectID, arg.Status)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListEpicsRow{}
-	for rows.Next() {
-		var i ListEpicsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.Title,
-			&i.Description,
-			&i.Status,
-			&i.Priority,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listTasksUnified = `-- name: ListTasksUnified :many
 SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks

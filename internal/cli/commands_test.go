@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SuprPhatAnon/phatodo/internal/config"
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
@@ -19,6 +20,12 @@ type fakeAPIClient struct {
 	getProjectConfigFn   func(context.Context, string, string) (ProjectConfigItem, error)
 	setProjectConfigFn   func(context.Context, string, string, string) (ProjectConfigItem, error)
 	unsetProjectConfigFn func(context.Context, string, string) (ProjectConfigItem, error)
+	createEpicFn         func(context.Context, string, domain.EpicCreateRequest) (domain.Epic, error)
+	listEpicsFn          func(context.Context, string, string) (domain.EpicListResponse, error)
+	getEpicFn            func(context.Context, string, string) (domain.Epic, error)
+	updateEpicFn         func(context.Context, string, string, domain.EpicUpdateRequest) (domain.Epic, error)
+	completeEpicFn       func(context.Context, string, string) (domain.Epic, error)
+	deleteEpicFn         func(context.Context, string, string) (domain.Epic, error)
 	createTaskFn         func(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
 	createSubtaskFn      func(context.Context, string, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
 	getTaskFn            func(context.Context, string, string) (domain.TaskDetail, error)
@@ -33,6 +40,9 @@ type fakeAPIClient struct {
 	listDependenciesFn   func(context.Context, string, string) (domain.DependencyListResponse, error)
 	addDependencyFn      func(context.Context, string, string, string) (domain.Dependency, error)
 	removeDependencyFn   func(context.Context, string, string, string) (domain.Dependency, error)
+	listLocksFn          func(context.Context, string, string, string, bool) (domain.LockListResponse, error)
+	acquireLockFn        func(context.Context, string, domain.LockAcquireRequest) (domain.WorkItemLock, error)
+	releaseLockFn        func(context.Context, string, string) (domain.WorkItemLock, error)
 	searchFn             func(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
 	historyFn            func(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
 	listUnifiedFn        func(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
@@ -55,6 +65,48 @@ func (f *fakeAPIClient) SetProjectConfig(ctx context.Context, projectID, key, va
 
 func (f *fakeAPIClient) UnsetProjectConfig(ctx context.Context, projectID, key string) (ProjectConfigItem, error) {
 	return f.unsetProjectConfigFn(ctx, projectID, key)
+}
+
+func (f *fakeAPIClient) CreateEpic(ctx context.Context, projectID string, req domain.EpicCreateRequest) (domain.Epic, error) {
+	if f.createEpicFn == nil {
+		return domain.Epic{}, nil
+	}
+	return f.createEpicFn(ctx, projectID, req)
+}
+
+func (f *fakeAPIClient) ListEpics(ctx context.Context, projectID, status string) (domain.EpicListResponse, error) {
+	if f.listEpicsFn == nil {
+		return domain.EpicListResponse{}, nil
+	}
+	return f.listEpicsFn(ctx, projectID, status)
+}
+
+func (f *fakeAPIClient) GetEpic(ctx context.Context, projectID, epicID string) (domain.Epic, error) {
+	if f.getEpicFn == nil {
+		return domain.Epic{}, nil
+	}
+	return f.getEpicFn(ctx, projectID, epicID)
+}
+
+func (f *fakeAPIClient) UpdateEpic(ctx context.Context, projectID, epicID string, req domain.EpicUpdateRequest) (domain.Epic, error) {
+	if f.updateEpicFn == nil {
+		return domain.Epic{}, nil
+	}
+	return f.updateEpicFn(ctx, projectID, epicID, req)
+}
+
+func (f *fakeAPIClient) CompleteEpic(ctx context.Context, projectID, epicID string) (domain.Epic, error) {
+	if f.completeEpicFn == nil {
+		return domain.Epic{}, nil
+	}
+	return f.completeEpicFn(ctx, projectID, epicID)
+}
+
+func (f *fakeAPIClient) DeleteEpic(ctx context.Context, projectID, epicID string) (domain.Epic, error) {
+	if f.deleteEpicFn == nil {
+		return domain.Epic{}, nil
+	}
+	return f.deleteEpicFn(ctx, projectID, epicID)
 }
 
 func (f *fakeAPIClient) CreateTask(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
@@ -111,6 +163,27 @@ func (f *fakeAPIClient) AddDependency(ctx context.Context, projectID, taskID, de
 
 func (f *fakeAPIClient) RemoveDependency(ctx context.Context, projectID, taskID, dependsOnID string) (domain.Dependency, error) {
 	return f.removeDependencyFn(ctx, projectID, taskID, dependsOnID)
+}
+
+func (f *fakeAPIClient) ListLocks(ctx context.Context, projectID, entityTypes, entityID string, active bool) (domain.LockListResponse, error) {
+	if f.listLocksFn == nil {
+		return domain.LockListResponse{}, nil
+	}
+	return f.listLocksFn(ctx, projectID, entityTypes, entityID, active)
+}
+
+func (f *fakeAPIClient) AcquireLock(ctx context.Context, projectID string, req domain.LockAcquireRequest) (domain.WorkItemLock, error) {
+	if f.acquireLockFn == nil {
+		return domain.WorkItemLock{}, nil
+	}
+	return f.acquireLockFn(ctx, projectID, req)
+}
+
+func (f *fakeAPIClient) ReleaseLock(ctx context.Context, projectID, lockID string) (domain.WorkItemLock, error) {
+	if f.releaseLockFn == nil {
+		return domain.WorkItemLock{}, nil
+	}
+	return f.releaseLockFn(ctx, projectID, lockID)
 }
 
 func (f *fakeAPIClient) Search(ctx context.Context, projectID, query, entityType, status string, limit int) (domain.SearchResponse, error) {
@@ -190,6 +263,220 @@ func TestRunTaskListCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "status: in_progress")
 	require.Contains(t, stdout.String(), "epicId: epic-1")
+}
+
+func TestRunEpicListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listEpicsFn: func(ctx context.Context, projectID, status string) (domain.EpicListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "in_progress", status)
+				return domain.EpicListResponse{
+					ProjectID: "default",
+					Items: []domain.Epic{
+						{
+							ID:        "EPIC-1",
+							Title:     "Track auth",
+							Status:    domain.StatusInProgress,
+							Priority:  domain.PriorityCritical,
+							CreatedAt: time.Date(2026, 6, 9, 2, 13, 2, 0, time.UTC),
+							UpdatedAt: time.Date(2026, 6, 13, 15, 1, 51, 0, time.UTC),
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"epic", "list", "--status", "in_progress"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "epics[1]:")
+	require.Contains(t, stdout.String(), "- id: EPIC-1")
+	require.Contains(t, stdout.String(), "status: in_progress")
+}
+
+func TestRunLockAcquireCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			acquireLockFn: func(ctx context.Context, projectID string, req domain.LockAcquireRequest) (domain.WorkItemLock, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "task", req.EntityType)
+				require.Equal(t, "ABC-1", req.EntityID)
+				require.Equal(t, "editing", req.Reason)
+				require.Equal(t, "30m", req.TTL)
+				return domain.WorkItemLock{
+					ID:         "LOCK-1",
+					EntityType: "task",
+					EntityID:   "ABC-1",
+					LockedBy:   "user-1",
+					Reason:     "editing",
+					LeasedAt:   time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+					ExpiresAt:  time.Date(2026, 6, 15, 12, 30, 0, 0, time.UTC),
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"lock", "acquire", "task", "ABC-1", "--reason", "editing", "--expires", "30m"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: LOCK-1")
+	require.Contains(t, stdout.String(), "entityType: task")
+	require.Contains(t, stdout.String(), "entityId: ABC-1")
+}
+
+func TestRunLockListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listLocksFn: func(ctx context.Context, projectID, entityTypes, entityID string, active bool) (domain.LockListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "epic,task", entityTypes)
+				require.Equal(t, "EPIC-1", entityID)
+				require.True(t, active)
+				return domain.LockListResponse{
+					ProjectID: "default",
+					Items: []domain.WorkItemLock{
+						{
+							ID:         "LOCK-2",
+							EntityType: "epic",
+							EntityID:   "EPIC-1",
+							LockedBy:   "user-1",
+							Reason:     "planning",
+							LeasedAt:   time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+							ExpiresAt:  time.Date(2026, 6, 15, 13, 0, 0, 0, time.UTC),
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"lock", "list", "--type", "epic,task", "--entity", "EPIC-1", "--active"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "locks[1]:")
+	require.Contains(t, stdout.String(), "- id: LOCK-2")
+	require.Contains(t, stdout.String(), "entityType: epic")
+}
+
+func TestRunLockReleaseCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			releaseLockFn: func(ctx context.Context, projectID, lockID string) (domain.WorkItemLock, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "LOCK-3", lockID)
+				return domain.WorkItemLock{
+					ID:         "LOCK-3",
+					EntityType: "subtask",
+					EntityID:   "ABC-2",
+					LockedBy:   "user-1",
+					Reason:     "review",
+					LeasedAt:   time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+					ExpiresAt:  time.Date(2026, 6, 15, 13, 0, 0, 0, time.UTC),
+					ReleasedAt: time.Date(2026, 6, 15, 12, 30, 0, 0, time.UTC),
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"lock", "release", "LOCK-3"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: LOCK-3")
+	require.Contains(t, stdout.String(), "releasedAt:")
 }
 
 func TestRunReadyCallsServer(t *testing.T) {

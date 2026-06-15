@@ -86,6 +86,20 @@ tasks[1]:
     epicId: epic-1
 ```
 
+`ptodo epic show EPIC-1`:
+
+```text
+- id: EPIC-1
+  title: "Track auth"
+  description: "Add end-to-end auth checks across the CLI and API."
+  priority: 0
+  status: in_progress
+  assignedTo: bryan
+  acceptanceCriteria[2]:
+    - "CLI commands require project config"
+    - "API routes reject missing credentials"
+```
+
 `ptodo ready --epic epic-1`:
 
 ```text
@@ -154,6 +168,41 @@ dependencies[1]:
   - id: dep-1
     taskId: ABC-1
     dependsOnId: ABC-2
+```
+
+### Locks
+
+Render:
+
+- lock ID
+- entity type
+- entity ID
+- owner
+- expiration
+
+`ptodo lock acquire task ABC-1 --reason "editing" --expires 30m`:
+
+```text
+- id: LOCK-1
+  entityType: task
+  entityId: ABC-1
+  lockedBy: user-1
+  reason: editing
+  leasedAt: "2026-06-15T12:00:00Z"
+  expiresAt: "2026-06-15T12:30:00Z"
+```
+
+`ptodo lock list --type epic,task --entity EPIC-1 --active`:
+
+```text
+locks[1]:
+  - id: LOCK-2
+    entityType: epic
+    entityId: EPIC-1
+    lockedBy: user-1
+    reason: planning
+    leasedAt: "2026-06-15T12:00:00Z"
+    expiresAt: "2026-06-15T13:00:00Z"
 ```
 
 ### Search, History, List

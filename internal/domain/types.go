@@ -159,15 +159,47 @@ type ReadyListResponse struct {
 }
 
 type Epic struct {
-	ID          string
-	WorkspaceID string
-	ProjectID   string
-	Title       string
-	Description string
-	Status      Status
-	Priority    Priority
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID                 string    `json:"id"`
+	WorkspaceID        string    `json:"workspace_id,omitempty"`
+	ProjectID          string    `json:"project_id,omitempty"`
+	AssignedTo         string    `json:"assigned_to,omitempty"`
+	CreatedBy          string    `json:"created_by,omitempty"`
+	UpdatedBy          string    `json:"updated_by,omitempty"`
+	CompletedBy        string    `json:"completed_by,omitempty"`
+	Title              string    `json:"title"`
+	Description        string    `json:"description,omitempty"`
+	Status             Status    `json:"status"`
+	Priority           Priority  `json:"priority"`
+	AcceptanceCriteria []string  `json:"acceptance_criteria,omitempty"`
+	CompletionEvidence []string  `json:"completion_evidence,omitempty"`
+	CompletionSummary  string    `json:"completion_summary,omitempty"`
+	CompletedAt        time.Time `json:"completed_at,omitempty"`
+	CreatedAt          time.Time `json:"created_at,omitempty"`
+	UpdatedAt          time.Time `json:"updated_at,omitempty"`
+}
+
+type EpicCreateRequest struct {
+	Title              string    `json:"title"`
+	Description        string    `json:"description,omitempty"`
+	Priority           *Priority `json:"priority,omitempty"`
+	AssignedTo         string    `json:"assigned_to,omitempty"`
+	AcceptanceCriteria []string  `json:"acceptance_criteria,omitempty"`
+}
+
+type EpicUpdateRequest struct {
+	Title              *string   `json:"title,omitempty"`
+	Description        *string   `json:"description,omitempty"`
+	Priority           *Priority `json:"priority,omitempty"`
+	Status             *Status   `json:"status,omitempty"`
+	AssignedTo         *string   `json:"assigned_to,omitempty"`
+	AcceptanceCriteria *[]string `json:"acceptance_criteria,omitempty"`
+	CompletionSummary  *string   `json:"completion_summary,omitempty"`
+	CompletionEvidence *[]string `json:"completion_evidence,omitempty"`
+}
+
+type EpicListResponse struct {
+	ProjectID string `json:"project_id"`
+	Items     []Epic `json:"items"`
 }
 
 type Comment struct {
@@ -212,6 +244,32 @@ type DependencyListResponse struct {
 	ProjectID string       `json:"project_id"`
 	TaskID    string       `json:"task_id"`
 	Items     []Dependency `json:"items"`
+}
+
+type WorkItemLock struct {
+	ID          string    `json:"id"`
+	WorkspaceID string    `json:"workspace_id,omitempty"`
+	ProjectID   string    `json:"project_id,omitempty"`
+	EntityType  string    `json:"entity_type"`
+	EntityID    string    `json:"entity_id"`
+	LockedBy    string    `json:"locked_by"`
+	Reason      string    `json:"reason,omitempty"`
+	LeasedAt    time.Time `json:"leased_at,omitempty"`
+	ExpiresAt   time.Time `json:"expires_at,omitempty"`
+	ReleasedAt  time.Time `json:"released_at,omitempty"`
+}
+
+type LockAcquireRequest struct {
+	EntityType string     `json:"entity_type"`
+	EntityID   string     `json:"entity_id"`
+	Reason     string     `json:"reason,omitempty"`
+	TTL        string     `json:"ttl,omitempty"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+}
+
+type LockListResponse struct {
+	ProjectID string         `json:"project_id"`
+	Items     []WorkItemLock `json:"items"`
 }
 
 type SearchItem struct {

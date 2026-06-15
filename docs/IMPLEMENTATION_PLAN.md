@@ -46,15 +46,14 @@ Local `.phatodo/` data should stay limited to client config and optional cache d
 
 ### Phase 2
 
-- Fill out the remaining read APIs for epics and locks.
-- Add repository implementations for projects, epics, tasks, comments, and dependencies.
+- Add repository implementations for projects, epics, tasks, comments, dependencies, and locks.
 - Make output formatting consistent across commands.
 
 ### Phase 3
 
 - Implement write paths and lifecycle validation.
 - Record immutable audit events for all meaningful changes.
-- Add lock handling for edit and completion flows.
+- Add lock cleanup and release handling for task and epic lifecycle flows.
 
 ### Phase 4
 

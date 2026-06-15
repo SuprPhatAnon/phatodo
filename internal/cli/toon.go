@@ -189,6 +189,38 @@ func writeTaskDetail(w io.Writer, item domain.TaskDetail) {
 	writeTOONTimeField(w, 1, "updatedAt", item.UpdatedAt)
 }
 
+func writeEpic(w io.Writer, indent int, item domain.Epic) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "title", item.Title)
+	writeTOONField(w, indent+1, "description", item.Description)
+	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
+	writeTOONField(w, indent+1, "status", string(item.Status))
+	if item.AssignedTo != "" {
+		writeTOONField(w, indent+1, "assignedTo", item.AssignedTo)
+	}
+	if item.CreatedBy != "" {
+		writeTOONField(w, indent+1, "createdBy", item.CreatedBy)
+	}
+	if item.UpdatedBy != "" {
+		writeTOONField(w, indent+1, "updatedBy", item.UpdatedBy)
+	}
+	if item.CompletedBy != "" {
+		writeTOONField(w, indent+1, "completedBy", item.CompletedBy)
+	}
+	if len(item.AcceptanceCriteria) > 0 {
+		writeTOONStringArray(w, indent+1, "acceptanceCriteria", item.AcceptanceCriteria)
+	}
+	if len(item.CompletionEvidence) > 0 {
+		writeTOONStringArray(w, indent+1, "completionEvidence", item.CompletionEvidence)
+	}
+	if item.CompletionSummary != "" {
+		writeTOONField(w, indent+1, "completionSummary", item.CompletionSummary)
+	}
+	writeTOONTimeField(w, indent+1, "completedAt", item.CompletedAt)
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
+}
+
 func writeComment(w io.Writer, indent int, item domain.Comment) {
 	writeTOONListItemStart(w, indent, "id", item.ID)
 	writeTOONField(w, indent+1, "author", item.Author)
@@ -203,6 +235,19 @@ func writeDependency(w io.Writer, indent int, item domain.Dependency) {
 	writeTOONField(w, indent+1, "taskId", item.TaskID)
 	writeTOONField(w, indent+1, "dependsOnId", item.DependsOnID)
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+}
+
+func writeLock(w io.Writer, indent int, item domain.WorkItemLock) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "entityType", item.EntityType)
+	writeTOONField(w, indent+1, "entityId", item.EntityID)
+	writeTOONField(w, indent+1, "lockedBy", item.LockedBy)
+	if item.Reason != "" {
+		writeTOONField(w, indent+1, "reason", item.Reason)
+	}
+	writeTOONTimeField(w, indent+1, "leasedAt", item.LeasedAt)
+	writeTOONTimeField(w, indent+1, "expiresAt", item.ExpiresAt)
+	writeTOONTimeField(w, indent+1, "releasedAt", item.ReleasedAt)
 }
 
 func writeSearchItem(w io.Writer, indent int, item domain.SearchItem) {

@@ -22,6 +22,12 @@ func main() {
 
 	var projectConfigStore server.ProjectConfigReader
 	var projectConfigWriter server.ProjectConfigWriter
+	var epicLister server.EpicLister
+	var epicReader server.EpicReader
+	var epicCreator server.EpicCreator
+	var epicUpdater server.EpicUpdater
+	var epicCompleter server.EpicCompleter
+	var epicDeleter server.EpicDeleter
 	var taskCreator server.TaskCreator
 	var taskLister server.TaskLister
 	var subtaskLister server.SubtaskLister
@@ -35,6 +41,9 @@ func main() {
 	var dependencyLister server.DependencyLister
 	var dependencyAdder server.DependencyAdder
 	var dependencyRemover server.DependencyRemover
+	var lockLister server.LockLister
+	var lockAcquirer server.LockAcquirer
+	var lockReleaser server.LockReleaser
 	var searcher server.Searcher
 	var historian server.Historian
 	var listLister server.ListLister
@@ -49,6 +58,12 @@ func main() {
 		defer store.Close()
 		projectConfigStore = store
 		projectConfigWriter = store
+		epicLister = store
+		epicReader = store
+		epicCreator = store
+		epicUpdater = store
+		epicCompleter = store
+		epicDeleter = store
 		taskCreator = store
 		taskLister = store
 		subtaskLister = store
@@ -62,6 +77,9 @@ func main() {
 		dependencyLister = store
 		dependencyAdder = store
 		dependencyRemover = store
+		lockLister = store
+		lockAcquirer = store
+		lockReleaser = store
 		searcher = store
 		historian = store
 		listLister = store
@@ -74,6 +92,12 @@ func main() {
 		PostgresDSN:         postgresDSN,
 		ProjectConfigReader: projectConfigStore,
 		ProjectConfigWriter: projectConfigWriter,
+		EpicLister:          epicLister,
+		EpicReader:          epicReader,
+		EpicCreator:         epicCreator,
+		EpicUpdater:         epicUpdater,
+		EpicCompleter:       epicCompleter,
+		EpicDeleter:         epicDeleter,
 		TaskCreator:         taskCreator,
 		TaskLister:          taskLister,
 		SubtaskLister:       subtaskLister,
@@ -87,6 +111,9 @@ func main() {
 		DependencyLister:    dependencyLister,
 		DependencyAdder:     dependencyAdder,
 		DependencyRemover:   dependencyRemover,
+		LockLister:          lockLister,
+		LockAcquirer:        lockAcquirer,
+		LockReleaser:        lockReleaser,
 		Searcher:            searcher,
 		Historian:           historian,
 		ListLister:          listLister,

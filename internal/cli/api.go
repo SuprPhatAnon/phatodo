@@ -28,6 +28,12 @@ type apiClient interface {
 	GetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
 	SetProjectConfig(context.Context, string, string, string) (ProjectConfigItem, error)
 	UnsetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
+	CreateEpic(context.Context, string, domain.EpicCreateRequest) (domain.Epic, error)
+	ListEpics(context.Context, string, string) (domain.EpicListResponse, error)
+	GetEpic(context.Context, string, string) (domain.Epic, error)
+	UpdateEpic(context.Context, string, string, domain.EpicUpdateRequest) (domain.Epic, error)
+	CompleteEpic(context.Context, string, string) (domain.Epic, error)
+	DeleteEpic(context.Context, string, string) (domain.Epic, error)
 	CreateTask(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
 	CreateSubtask(context.Context, string, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
 	GetTask(context.Context, string, string) (domain.TaskDetail, error)
@@ -42,6 +48,9 @@ type apiClient interface {
 	ListDependencies(context.Context, string, string) (domain.DependencyListResponse, error)
 	AddDependency(context.Context, string, string, string) (domain.Dependency, error)
 	RemoveDependency(context.Context, string, string, string) (domain.Dependency, error)
+	ListLocks(context.Context, string, string, string, bool) (domain.LockListResponse, error)
+	AcquireLock(context.Context, string, domain.LockAcquireRequest) (domain.WorkItemLock, error)
+	ReleaseLock(context.Context, string, string) (domain.WorkItemLock, error)
 	Search(context.Context, string, string, string, string, int) (domain.SearchResponse, error)
 	History(context.Context, string, string, string, string, string, int) (domain.HistoryResponse, error)
 	ListUnified(context.Context, string, string, string, string, string, int) (domain.ListResponse, error)
@@ -145,6 +154,82 @@ func (c *APIClient) UnsetProjectConfig(ctx context.Context, projectID string, ke
 	var payload ProjectConfigItem
 	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/config/%s", url.PathEscape(projectID), url.PathEscape(key)), nil, &payload); err != nil {
 		return ProjectConfigItem{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) CreateEpic(ctx context.Context, projectID string, req domain.EpicCreateRequest) (domain.Epic, error) {
+	var payload domain.Epic
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/epics", url.PathEscape(projectID)), req, &payload); err != nil {
+		return domain.Epic{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ListEpics(ctx context.Context, projectID string, status string) (domain.EpicListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "epics")
+	query := endpoint.Query()
+	if status != "" {
+		query.Set("status", status)
+	}
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return domain.EpicListResponse{}, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.EpicListResponse{}, fmt.Errorf("call api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return domain.EpicListResponse{}, fmt.Errorf("list epics failed: %s", resp.Status)
+	}
+
+	var payload domain.EpicListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.EpicListResponse{}, fmt.Errorf("decode epic list response: %w", err)
+	}
+
+	return payload, nil
+}
+
+func (c *APIClient) GetEpic(ctx context.Context, projectID string, epicID string) (domain.Epic, error) {
+	var payload domain.Epic
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/epics/%s", url.PathEscape(projectID), url.PathEscape(epicID)), nil, &payload); err != nil {
+		return domain.Epic{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) UpdateEpic(ctx context.Context, projectID string, epicID string, req domain.EpicUpdateRequest) (domain.Epic, error) {
+	var payload domain.Epic
+	if err := c.doJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/v1/projects/%s/epics/%s", url.PathEscape(projectID), url.PathEscape(epicID)), req, &payload); err != nil {
+		return domain.Epic{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) CompleteEpic(ctx context.Context, projectID string, epicID string) (domain.Epic, error) {
+	var payload domain.Epic
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/epics/%s/complete", url.PathEscape(projectID), url.PathEscape(epicID)), nil, &payload); err != nil {
+		return domain.Epic{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) DeleteEpic(ctx context.Context, projectID string, epicID string) (domain.Epic, error) {
+	var payload domain.Epic
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/epics/%s", url.PathEscape(projectID), url.PathEscape(epicID)), nil, &payload); err != nil {
+		return domain.Epic{}, err
 	}
 	return payload, nil
 }
@@ -295,6 +380,44 @@ func (c *APIClient) RemoveDependency(ctx context.Context, projectID string, task
 	var payload domain.Dependency
 	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/dependencies/%s", url.PathEscape(projectID), url.PathEscape(taskID), url.PathEscape(dependsOnID)), nil, &payload); err != nil {
 		return domain.Dependency{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ListLocks(ctx context.Context, projectID string, entityTypes string, entityID string, active bool) (domain.LockListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "locks")
+	query := endpoint.Query()
+	if entityTypes != "" {
+		query.Set("type", entityTypes)
+	}
+	if entityID != "" {
+		query.Set("entity", entityID)
+	}
+	if active {
+		query.Set("active", "true")
+	}
+	endpoint.RawQuery = query.Encode()
+
+	var payload domain.LockListResponse
+	if err := c.doGETJSON(ctx, endpoint.String(), &payload); err != nil {
+		return domain.LockListResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) AcquireLock(ctx context.Context, projectID string, req domain.LockAcquireRequest) (domain.WorkItemLock, error) {
+	var payload domain.WorkItemLock
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/locks", url.PathEscape(projectID)), req, &payload); err != nil {
+		return domain.WorkItemLock{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ReleaseLock(ctx context.Context, projectID string, lockID string) (domain.WorkItemLock, error) {
+	var payload domain.WorkItemLock
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/locks/%s", url.PathEscape(projectID), url.PathEscape(lockID)), nil, &payload); err != nil {
+		return domain.WorkItemLock{}, err
 	}
 	return payload, nil
 }
