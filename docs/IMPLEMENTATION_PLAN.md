@@ -67,6 +67,7 @@ Local `.phatodo/` data should stay limited to client config and optional cache d
 - The command-to-endpoint-to-table map is documented in `docs/COMMAND_MAP.md`.
 - The bootstrap contract is documented in `docs/BOOTSTRAP.md`.
 - The command request/response contract is documented in `docs/COMMAND_CONTRACTS.md`.
+- Repo workflow guardrails, including task usage and database authorization rules, are documented in `docs/WORKFLOW.md`.
 - Validation rules are documented in `docs/VALIDATION_RULES.md`.
 - Authorization rules are documented in `docs/AUTHORIZATION.md`.
 - Error handling is documented in `docs/ERRORS.md`.

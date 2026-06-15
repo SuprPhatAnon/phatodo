@@ -51,8 +51,8 @@ build-server:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/phatodo-server ./cmd/phatodo-server
 
 install: build-cli
-	@mkdir -p $(GOPATH)/bin
-	install -m 0755 $(BIN_DIR)/ptodo $(GOPATH)/bin/ptodo
+	@mkdir -p /home/bryan/.local/bin
+	install -m 0755 $(BIN_DIR)/ptodo /home/bryan/.local/bin/ptodo
 
 test:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./...
