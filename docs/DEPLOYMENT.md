@@ -38,8 +38,9 @@ The manifests in `deploy/k3s/` deploy:
 - `phatodo-server` Deployment and Service
 - Postgres StatefulSet and Service
 - Postgres Secret
-- Traefik Ingress
-- cert-manager `Issuer` for Let's Encrypt TLS
+- Traefik Ingress over plain HTTP by default
+
+TLS is optional. The checked-in k3s bundle does not require cert-manager or a certificate issuer to be present. If you want HTTPS later, add a separate TLS overlay or manifest rather than changing the default deployment path.
 
 Run database migrations separately after Postgres is available. The current server image includes `migrations/`, but no migration runner has been implemented yet.
 

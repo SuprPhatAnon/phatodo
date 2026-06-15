@@ -81,3 +81,35 @@ type Comment struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+type ProjectConfig struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type AdminInitRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AdminInitResponse struct {
+	UserID       string `json:"user_id"`
+	Username     string `json:"username"`
+	AccessKey    string `json:"access_key"`
+	AccessSecret string `json:"access_secret"`
+}
+
+type AdminBootstrapRequest struct {
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	WorkspaceName string `json:"workspace_name"`
+	ProjectName   string `json:"project_name"`
+	IssuePrefix   string `json:"issue_prefix"`
+}
+
+type AdminBootstrapResponse struct {
+	WorkspaceID  string `json:"workspace_id"`
+	ProjectID    string `json:"project_id"`
+	AccessKey    string `json:"access_key"`
+	AccessSecret string `json:"access_secret"`
+}

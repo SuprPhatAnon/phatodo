@@ -6,7 +6,7 @@ This document describes the intended end state for the CLI, API, and database la
 
 Phatodo should work as a three-layer system:
 
-1. `phatodo`, `ptd`, and `ptodo` act as thin clients.
+1. `ptodo` acts as the thin client.
 2. The server owns all canonical task data and validation.
 3. Postgres stores projects, tasks, epics, comments, dependencies, config, history, locks, and search indexes.
 
@@ -66,6 +66,14 @@ Local `.phatodo/` data should stay limited to client config and optional cache d
 
 - The CLI command shape is documented in `docs/trekker_reference.txt`.
 - The command-to-endpoint-to-table map is documented in `docs/COMMAND_MAP.md`.
+- The bootstrap contract is documented in `docs/BOOTSTRAP.md`.
+- The command request/response contract is documented in `docs/COMMAND_CONTRACTS.md`.
+- Validation rules are documented in `docs/VALIDATION_RULES.md`.
+- Authorization rules are documented in `docs/AUTHORIZATION.md`.
+- Error handling is documented in `docs/ERRORS.md`.
+- Operational startup notes are documented in `docs/OPERATIONS.md`.
+- Import expectations are documented in `docs/IMPORT.md`.
+- CLI output rules are documented in `docs/CLI_OUTPUT.md`.
 - The server route shape is documented in `docs/API.md`.
 - The schema model is documented in `docs/DATABASE_SCHEMA.md`.
 - The end-to-end request and storage path is documented in `docs/DATAFLOW.md`.

@@ -14,6 +14,7 @@ func (a *app) routes() http.Handler {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /api/health", a.health)
+	a.registerAdminRoutes(mux)
 	mux.Handle("GET /api/v1", a.withAPIAuth(http.HandlerFunc(a.apiIndex)))
 
 	a.registerProjectRoutes(mux)
@@ -27,6 +28,11 @@ func (a *app) routes() http.Handler {
 	mux.HandleFunc("GET /", a.dashboardPlaceholder)
 
 	return mux
+}
+
+func (a *app) registerAdminRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/v1/admin/init", a.adminInit)
+	mux.HandleFunc("POST /api/v1/admin/bootstrap", a.adminBootstrap)
 }
 
 func (a *app) registerProjectRoutes(mux *http.ServeMux) {
@@ -70,7 +76,7 @@ func (a *app) registerDependencyRoutes(mux *http.ServeMux) {
 }
 
 func (a *app) registerConfigRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/config", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.list"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/config", a.withAPIAuth(http.HandlerFunc(a.listProjectConfig)))
 	mux.Handle("GET /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.get"))))
 	mux.Handle("PUT /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.set"))))
 	mux.Handle("DELETE /api/v1/projects/{projectID}/config/{key}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("config.unset"))))

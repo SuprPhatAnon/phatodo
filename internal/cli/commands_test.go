@@ -2,10 +2,18 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/SuprPhatAnon/phatodo/internal/config"
+	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunAcceptsTrekkerCompatibleTaskCommand(t *testing.T) {
@@ -64,4 +72,122 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	if !strings.Contains(stderr.String(), "unknown command") {
 		t.Fatalf("expected unknown command error, got %q", stderr.String())
 	}
+}
+
+func TestRunConfigListFetchesProjectConfig(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/projects/default/config", r.URL.Path)
+		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
+		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"project_id": "default",
+			"items": []map[string]string{
+				{"key": "issue_prefix", "value": "ABC"},
+			},
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := config.LocalConfig{
+		APIURL:       server.URL,
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"config", "list"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+}
+
+func TestRunAdminInitCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	oldPrompt := readPasswordPrompt
+	readPasswordPrompt = func(prompt string, _ io.Writer) (string, error) {
+		return "secret", nil
+	}
+	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
+
+	var got domain.AdminInitRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/v1/admin/init", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"user_id":       "usr_1",
+			"username":      got.Username,
+			"access_key":    "key_1",
+			"access_secret": "sec_1",
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	code := Run([]string{"admin", "init", "-u", "alice", "--url", server.URL}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Equal(t, "alice", got.Username)
+	require.Equal(t, "secret", got.Password)
+	require.Contains(t, stdout.String(), "access_key=key_1")
+}
+
+func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldPrompt := readPasswordPrompt
+	readPasswordPrompt = func(prompt string, _ io.Writer) (string, error) {
+		return "secret", nil
+	}
+	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
+
+	var got domain.AdminBootstrapRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "/api/v1/admin/bootstrap", r.URL.Path)
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"workspace_id":  "ws_1",
+			"project_id":    "prj_1",
+			"access_key":    "key_1",
+			"access_secret": "sec_1",
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	code := Run([]string{"admin", "bootstrap", "-u", "alice", "--url", server.URL}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Equal(t, "alice", got.Username)
+	require.Equal(t, "secret", got.Password)
+	require.Equal(t, "phatodo", got.WorkspaceName)
+	require.Equal(t, "phatodo", got.ProjectName)
+	require.Equal(t, "PHATOD", got.IssuePrefix)
+	configPath := filepath.Join(workdir, ".phatodo", "config.json")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	require.Contains(t, string(data), `"project_id": "prj_1"`)
 }

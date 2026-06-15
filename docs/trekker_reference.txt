@@ -1,6 +1,6 @@
-# Phatodo Command Reference
+# Ptodo Command Reference
 
-Trekker-derived command shape preserved by `phatodo`, `ptd`, and `ptodo`.
+Trekker-derived command shape preserved by `ptodo`.
 
 Issue tracker for AI agents. Canonical data is stored on the server; local `.phatodo/config.json` holds client configuration.
 

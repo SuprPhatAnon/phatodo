@@ -1,10 +1,10 @@
 # CLI Compatibility
 
-The `phatodo`, `ptd`, and `ptodo` executables should keep the command shape preserved in `docs/trekker_reference.txt` while moving storage to the server.
+The `ptodo` executable should keep the command shape preserved in `docs/trekker_reference.txt` while moving storage to the server.
 
 ## Required Command Groups
 
-- Setup: `init`, `wipe -y`
+- Setup: `admin init`, `admin bootstrap`, `wipe -y`
 - Epics: `epic create`, `epic list`, `epic show`, `epic update`, `epic complete`, `epic delete`
 - Tasks: `task create`, `task list`, `task show`, `task update`, `task delete`
 - Subtasks: `subtask create`, `subtask list`, `subtask update`, `subtask delete`
@@ -31,7 +31,7 @@ The Trekker-compatible command surface is extended to cover schema-backed fields
 
 ## Client Configuration
 
-`phatodo init` and `ptd init` should write local project configuration only:
+`ptodo admin bootstrap` should write local project configuration and the project-scoped CLI identity:
 
 - workspace ID
 - project ID

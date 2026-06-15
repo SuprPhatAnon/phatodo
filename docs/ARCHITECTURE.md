@@ -2,14 +2,12 @@
 
 Phatodo has two deliverables:
 
-1. Trekker-compatible command-line executables named `phatodo`, `ptd`, and `ptodo`.
+1. Trekker-compatible command-line executable named `ptodo`.
 2. A server-side API and dashboard backed by Postgres.
 
 ## Components
 
-- `cmd/phatodo` is the primary CLI entrypoint. It should preserve the command structure documented in `docs/trekker_reference.txt`.
-- `cmd/ptd` is the short CLI alias entrypoint.
-- `cmd/ptodo` is the additional CLI alias entrypoint.
+- `cmd/ptodo` is the CLI entrypoint. It should preserve the command structure documented in `docs/trekker_reference.txt`.
 - `cmd/phatodo-server` is the API and dashboard server entrypoint.
 - `internal/cli` owns command parsing, output modes such as `--toon`, and API client wiring.
 - `internal/server` owns HTTP routing for JSON APIs and dashboard delivery.
@@ -39,3 +37,14 @@ The build order and intended end state are documented in `docs/IMPLEMENTATION_PL
 The concrete CLI-to-API-to-database request path is documented in `docs/DATAFLOW.md`.
 
 The command-to-endpoint-to-table matrix is documented in `docs/COMMAND_MAP.md`.
+
+The bootstrap, contract, validation, auth, error, operations, import, and output docs are:
+
+- `docs/BOOTSTRAP.md`
+- `docs/COMMAND_CONTRACTS.md`
+- `docs/VALIDATION_RULES.md`
+- `docs/AUTHORIZATION.md`
+- `docs/ERRORS.md`
+- `docs/OPERATIONS.md`
+- `docs/IMPORT.md`
+- `docs/CLI_OUTPUT.md`

@@ -1,6 +1,6 @@
 # API
 
-The non-dashboard API is rooted at `/api/v1`. `/api/health` is public; all `/api/v1` routes require access-key authentication.
+The non-dashboard API is rooted at `/api/v1`. `/api/health` is public. Most `/api/v1` routes require access-key authentication, but `POST /api/v1/admin/init` and `POST /api/v1/admin/bootstrap` are bootstrap routes and use the bootstrap credential flow instead.
 
 ## Authentication
 
@@ -23,6 +23,8 @@ Project-scoped resources use this prefix:
 
 Initial route groups:
 
+- `POST /api/v1/admin/init`
+- `POST /api/v1/admin/bootstrap`
 - `GET|POST /api/v1/projects`
 - `GET|PATCH|DELETE /api/v1/projects/{projectID}`
 - `/epics` for epic list/create/show/update/complete/delete
@@ -44,3 +46,5 @@ The broader route and data rollout plan is described in `docs/IMPLEMENTATION_PLA
 The concrete request/handler/storage path for this route is documented in `docs/DATAFLOW.md`.
 
 The full command-to-endpoint-to-table map is documented in `docs/COMMAND_MAP.md`.
+
+The bootstrap, contract, validation, auth, error, operations, import, and output docs provide the remaining no-dashboard operating rules.

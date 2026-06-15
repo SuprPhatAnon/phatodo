@@ -74,4 +74,7 @@ For agent workflows, use `docs/trekker_reference.txt` as the behavioral referenc
   - Docs-only work: `PLAN -> document -> validate if applicable -> verify all requirements are done -> commit`.
 - Do not treat a task as complete until every explicit requirement is satisfied, the work has been validated, and any necessary documentation or tests are finished.
 - If work is interrupted or the scope changes, resume from the last unfinished requirement rather than starting a new partial path.
+- Do not work around missing dependencies, missing authorization, or missing information with brittle code, temporary stubs, or assumptions.
+- If a required dependency or authorization is needed, stop and ask before implementing.
+- Do not guess intent. Search the codebase and docs first; if the answer is still unclear, ask a direct clarification question before coding.
 - Modify `AGENTS.md` only when the user explicitly permits that edit for the current request; do not treat prior permission as session-wide.

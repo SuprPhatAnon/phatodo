@@ -1,10 +1,26 @@
 package server
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+
+	"github.com/SuprPhatAnon/phatodo/internal/domain"
+)
 
 type Config struct {
-	Addr        string
-	PostgresDSN string
+	Addr                string
+	PostgresDSN         string
+	ProjectConfigReader ProjectConfigReader
+	BootstrapManager    BootstrapManager
+}
+
+type ProjectConfigReader interface {
+	ListProjectConfig(context.Context, string) ([]domain.ProjectConfig, error)
+}
+
+type BootstrapManager interface {
+	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
+	BootstrapProject(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
 }
 
 func New(config Config) *http.Server {

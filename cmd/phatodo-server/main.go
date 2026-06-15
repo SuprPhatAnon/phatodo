@@ -12,18 +12,35 @@ import (
 	"time"
 
 	"github.com/SuprPhatAnon/phatodo/internal/server"
+	"github.com/SuprPhatAnon/phatodo/internal/storage/postgres"
 )
 
 func main() {
 	addr := env("PHATODO_ADDR", ":8080")
 	postgresDSN := env("PHATODO_DATABASE_URL", "")
+	ctx := context.Background()
+
+	var projectConfigStore server.ProjectConfigReader
+	var bootstrapManager server.BootstrapManager
+	if postgresDSN != "" {
+		store, err := postgres.NewStore(ctx, postgresDSN)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to connect to postgres: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		projectConfigStore = store
+		bootstrapManager = store
+	}
 
 	srv := server.New(server.Config{
-		Addr:        addr,
-		PostgresDSN: postgresDSN,
+		Addr:                addr,
+		PostgresDSN:         postgresDSN,
+		ProjectConfigReader: projectConfigStore,
+		BootstrapManager:    bootstrapManager,
 	})
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	errs := make(chan error, 1)

@@ -7,4 +7,3 @@ resources:
   - postgres.yaml
   - app.yaml
   - ingress.yaml
-  - cert-issuer.yaml

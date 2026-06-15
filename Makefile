@@ -16,20 +16,19 @@ K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
 GOMODCACHE ?= /tmp/phatodo-go-mod
 
-.PHONY: help build build-cli build-server test test-cli test-server run-cli run-ptd run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
+.PHONY: help build build-cli build-server test test-cli test-server run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
 
 help:
 	@echo "Targets:"
 	@echo "  build         Build CLI and server binaries"
-	@echo "  build-cli     Build the phatodo CLI"
+	@echo "  build-cli     Build the ptodo CLI"
 	@echo "  build-server  Build the phatodo-server API/dashboard"
 	@echo "  test          Run all Go tests"
 	@echo "  test-cli      Run CLI package tests"
 	@echo "  test-server   Run server package tests"
 	@echo "  gofmt         Format all Go files"
 	@echo "  sqlc          Run sqlc generation"
-	@echo "  run-cli       Run CLI help"
-	@echo "  run-ptd       Run short CLI alias help"
+	@echo "  run-ptodo     Run the ptodo help"
 	@echo "  run-server    Run the server locally"
 	@echo "  docker-build  Build the container image"
 	@echo "  docker-push   Push the container image"
@@ -43,8 +42,7 @@ build: build-cli build-server
 
 build-cli:
 	@mkdir -p $(BIN_DIR)
-	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/phatodo ./cmd/phatodo
-	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/ptd ./cmd/ptd
+	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/ptodo ./cmd/ptodo
 
 build-server:
 	@mkdir -p $(BIN_DIR)
@@ -54,7 +52,7 @@ test:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./...
 
 test-cli:
-	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./internal/cli ./cmd/phatodo ./cmd/ptd
+	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./internal/cli ./cmd/ptodo
 
 test-server:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./internal/server ./cmd/phatodo-server
@@ -66,11 +64,8 @@ sqlc:
 	@command -v sqlc >/dev/null 2>&1 || { echo "sqlc is not installed"; exit 1; }
 	sqlc generate
 
-run-cli:
-	$(GOFLAGS) $(GO) run ./cmd/phatodo --help
-
-run-ptd:
-	$(GOFLAGS) $(GO) run ./cmd/ptd --help
+run-ptodo:
+	$(GOFLAGS) $(GO) run ./cmd/ptodo --help
 
 run-server:
 	$(GOFLAGS) $(GO) run ./cmd/phatodo-server
