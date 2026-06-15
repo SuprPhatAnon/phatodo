@@ -71,10 +71,18 @@ CREATE TABLE IF NOT EXISTS epics (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
     project_id TEXT NOT NULL,
+    assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    completed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     description TEXT,
     status TEXT NOT NULL DEFAULT 'todo',
     priority INTEGER NOT NULL DEFAULT 2,
+    acceptance_criteria JSONB NOT NULL DEFAULT '[]'::jsonb,
+    completion_evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+    completion_summary TEXT,
+    completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (status IN ('todo', 'in_progress', 'completed', 'archived')),
@@ -89,11 +97,19 @@ CREATE TABLE IF NOT EXISTS tasks (
     project_id TEXT NOT NULL,
     epic_id TEXT,
     parent_task_id TEXT,
+    assigned_to TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    completed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     description TEXT,
     priority INTEGER NOT NULL DEFAULT 2,
     status TEXT NOT NULL DEFAULT 'todo',
     tags TEXT[] NOT NULL DEFAULT '{}',
+    acceptance_criteria JSONB NOT NULL DEFAULT '[]'::jsonb,
+    completion_evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+    completion_summary TEXT,
+    completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (status IN ('todo', 'in_progress', 'completed', 'wont_fix', 'archived')),
@@ -105,15 +121,34 @@ CREATE TABLE IF NOT EXISTS tasks (
     FOREIGN KEY (project_id, parent_task_id) REFERENCES tasks(project_id, id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS work_item_locks (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    locked_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reason TEXT,
+    leased_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    released_at TIMESTAMPTZ,
+    CHECK (entity_type IN ('epic', 'task', 'subtask')),
+    CHECK (expires_at > leased_at),
+    FOREIGN KEY (workspace_id, project_id) REFERENCES projects(workspace_id, id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
     project_id TEXT NOT NULL,
     task_id TEXT NOT NULL,
+    author_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
     author TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'comment',
     content TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (kind IN ('comment', 'analysis', 'summary', 'checkpoint', 'handoff')),
     UNIQUE (project_id, id),
     FOREIGN KEY (workspace_id, project_id) REFERENCES projects(workspace_id, id) ON DELETE CASCADE,
     FOREIGN KEY (project_id, task_id) REFERENCES tasks(project_id, id) ON DELETE CASCADE
@@ -140,10 +175,13 @@ CREATE TABLE IF NOT EXISTS events (
     action TEXT NOT NULL,
     entity_type TEXT NOT NULL,
     entity_id TEXT NOT NULL,
-    actor TEXT,
-    snapshot JSONB,
-    changes JSONB,
+    actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    actor_label TEXT,
+    before_state JSONB,
+    after_state JSONB,
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (action <> ''),
     FOREIGN KEY (workspace_id, project_id) REFERENCES projects(workspace_id, id) ON DELETE CASCADE
 );
 
@@ -170,13 +208,17 @@ CREATE TABLE IF NOT EXISTS search_index (
 CREATE INDEX IF NOT EXISTS idx_projects_workspace ON projects(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_user_project_access_project ON user_project_access(project_id);
 CREATE INDEX IF NOT EXISTS idx_epics_project_status ON epics(project_id, status);
+CREATE INDEX IF NOT EXISTS idx_epics_project_assigned ON epics(project_id, assigned_to);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_status ON tasks(project_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_epic ON tasks(project_id, epic_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_assigned ON tasks(project_id, assigned_to);
 CREATE INDEX IF NOT EXISTS idx_tasks_project_parent ON tasks(project_id, parent_task_id);
 CREATE INDEX IF NOT EXISTS idx_comments_task ON comments(project_id, task_id);
 CREATE INDEX IF NOT EXISTS idx_dependencies_task ON dependencies(project_id, task_id);
+CREATE INDEX IF NOT EXISTS idx_events_actor ON events(project_id, actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_events_entity ON events(project_id, entity_id);
 CREATE INDEX IF NOT EXISTS idx_events_type_action ON events(project_id, entity_type, action);
 CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(project_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_work_item_locks_active ON work_item_locks(project_id, entity_type, entity_id) WHERE released_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_search_document ON search_index USING GIN (document);
 CREATE INDEX IF NOT EXISTS idx_search_project_type ON search_index(project_id, entity_type);

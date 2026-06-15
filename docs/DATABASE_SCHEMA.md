@@ -9,6 +9,7 @@ The Postgres schema in `migrations/0001_initial.sql` is based on the schema crea
 - `users` are global server identities. `admin` users can access every workspace and project.
 - `user_project_access` locks a regular `user` to one project.
 - Project-owned tables carry both `workspace_id` and `project_id` so API queries can be scoped explicitly.
+- Work items carry explicit accountability metadata, including assignment, creator, updater, completion owner, completion timestamps, acceptance criteria, completion evidence, and time-bound locks.
 
 The CLI should store only client configuration locally, such as API URL, workspace ID, project ID, access key, and access secret. Canonical task data belongs in Postgres.
 
@@ -30,10 +31,11 @@ Authorization rules should be enforced by the API:
 - `project_config` maps Trekker config keys, now scoped per project instead of globally.
 - `id_counters` maps Trekker ID counters, now scoped per project.
 - `epics` maps directly to Trekker epics.
-- `tasks` maps Trekker tasks and subtasks. A row with `parent_task_id IS NULL` is a task; a row with `parent_task_id` is a subtask.
-- `comments` remains task-scoped, matching Trekker's current comment model.
+- `tasks` maps Trekker tasks and subtasks. A row with `parent_task_id IS NULL` is a task; a row with `parent_task_id` is a subtask. Tasks and epics now also carry accountability metadata for ownership, completion, and validation.
+- `work_item_locks` tracks time-bound leases on tasks, subtasks, and epics.
+- `comments` remains task-scoped, matching Trekker's current comment model, but adds a comment kind and optional user identity for checkpoint and summary tracking.
 - `dependencies` matches Trekker task dependencies and prevents duplicates per project.
-- `events` replaces Trekker's local event log with project-scoped audit history.
+- `events` replaces Trekker's local event log with project-scoped audit history and stores actor, before-state, after-state, and metadata details.
 - `search_index` replaces SQLite FTS5 with a Postgres `tsvector` search table.
 
 ## Compatibility Notes
@@ -41,3 +43,5 @@ Authorization rules should be enforced by the API:
 IDs remain `TEXT` so imported Trekker IDs can be preserved. Status and priority constraints follow `docs/trekker_reference.txt`: priorities are `0` through `5`; epics support `todo`, `in_progress`, `completed`, and `archived`; tasks also support `wont_fix`.
 
 Subtasks are stored in `tasks`, not a separate table, because that is how Trekker models them today. This keeps migration/import simpler and preserves unified task search, history, dependency, and comment behavior.
+
+Completion-related fields are intentionally explicit so the server can enforce accountability: tasks and epics can record who owns work, who completed it, what evidence was used, and which summary or checkpoint comment was left behind.

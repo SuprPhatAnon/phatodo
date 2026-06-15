@@ -24,6 +24,8 @@ Use the standard Go toolchain:
 
 - `make build` builds both executables into `bin/`.
 - `make test` runs all Go tests.
+- `make gofmt` formats all Go files.
+- `make sqlc` runs sqlc generation.
 - `make run-cli` shows the CLI command scaffold.
 - `make run-server` starts the server on `:8080`.
 - `make docker-build` builds the container image.
@@ -49,3 +51,27 @@ Pull requests should include a brief summary, the reason for the change, any com
 ## Agent-Specific Instructions
 
 For agent workflows, use `docs/trekker_reference.txt` as the behavioral reference. Preserve the documented Trekker command shape unless a design note explicitly changes it. The server is the source of truth; local `.phatodo` data should be limited to client config and optional cache data.
+
+## Change Control
+
+- Keep work narrowly scoped to the explicitly requested task. Do not expand into adjacent changes unless the user asks for them.
+- Do not rename, move, or delete files outside the explicit request.
+- Inspect existing patterns before editing, and match local conventions instead of introducing new ones.
+- Prefer minimal diffs over cleanup or refactors, even when adjacent code looks tempting.
+- Run the smallest relevant test set for the touched area, and call out any test gaps if you cannot run them.
+- Ask before any dependency changes, network fetches, or tooling installs that could affect the workspace.
+- Treat documentation updates as part of the normal workflow, including OpenAPI documents.
+- Any database schema change, or any `DELETE`, `UPDATE`, `UPSERT`, or `INSERT` query, requires task-specific user authorization before implementation.
+- When fixing a bug, perform a root-cause analysis and fix the underlying cause rather than masking symptoms.
+- For schema work, prefer explicit ownership and accountability fields such as `assigned_to`, `created_by`, `updated_by`, `completed_by`, and time-bound locks or leases when the design calls for them.
+- For task and epic completion, require explicit acceptance criteria, completion evidence, and a summary or checkpoint comment that states what was done and what remains.
+- Prefer immutable audit history that records actor, action, entity, before, after, and timestamp details for every meaningful change.
+- Do not mark a task complete unless its acceptance criteria are explicitly verified and any required validation evidence is present.
+- Every interruption or handoff must leave a checkpoint comment naming the current state, remaining work, and next concrete step.
+- Normal workflow should follow the task type:
+  - Feature work: `PLAN -> add/adjust tests -> do task -> validate -> document -> verify all requirements are done -> commit`.
+  - Bug fixes: `PLAN -> root-cause analysis -> add/adjust regression test -> do task -> validate -> document -> verify all requirements are done -> commit`.
+  - Docs-only work: `PLAN -> document -> validate if applicable -> verify all requirements are done -> commit`.
+- Do not treat a task as complete until every explicit requirement is satisfied, the work has been validated, and any necessary documentation or tests are finished.
+- If work is interrupted or the scope changes, resume from the last unfinished requirement rather than starting a new partial path.
+- Modify `AGENTS.md` only when the user explicitly permits that edit for the current request; do not treat prior permission as session-wide.

@@ -33,3 +33,5 @@ Initial route groups:
 - `/config`, `/search`, `/history`, and `/list`
 
 Handlers currently return structured `501 not_implemented` responses. This lets the CLI and tests stabilize around URL shape before Postgres repositories are wired in.
+
+Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, comment kind, and audit metadata.
