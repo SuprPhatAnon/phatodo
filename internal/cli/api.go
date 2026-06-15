@@ -28,7 +28,16 @@ type apiClient interface {
 	SetProjectConfig(context.Context, string, string, string) (ProjectConfigItem, error)
 	UnsetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
 	CreateTask(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	CreateSubtask(context.Context, string, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	GetTask(context.Context, string, string) (domain.TaskDetail, error)
+	UpdateTask(context.Context, string, string, domain.TaskUpdateRequest) (domain.TaskDetail, error)
+	DeleteTask(context.Context, string, string) (domain.TaskDetail, error)
 	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
+	ListSubtasks(context.Context, string, string) (domain.TaskListResponse, error)
+	ListComments(context.Context, string, string) (domain.CommentListResponse, error)
+	AddComment(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
+	UpdateComment(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
+	DeleteComment(context.Context, string, string) (domain.Comment, error)
 	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
 	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	BootstrapAdmin(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -141,6 +150,38 @@ func (c *APIClient) CreateTask(ctx context.Context, projectID string, req domain
 	return payload, nil
 }
 
+func (c *APIClient) CreateSubtask(ctx context.Context, projectID string, taskID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+	var payload domain.TaskCreateResponse
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/subtasks", url.PathEscape(projectID), url.PathEscape(taskID)), req, &payload); err != nil {
+		return domain.TaskCreateResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) GetTask(ctx context.Context, projectID string, taskID string) (domain.TaskDetail, error) {
+	var payload domain.TaskDetail
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/tasks/%s", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
+		return domain.TaskDetail{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) UpdateTask(ctx context.Context, projectID string, taskID string, req domain.TaskUpdateRequest) (domain.TaskDetail, error) {
+	var payload domain.TaskDetail
+	if err := c.doJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/v1/projects/%s/tasks/%s", url.PathEscape(projectID), url.PathEscape(taskID)), req, &payload); err != nil {
+		return domain.TaskDetail{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) DeleteTask(ctx context.Context, projectID string, taskID string) (domain.TaskDetail, error) {
+	var payload domain.TaskDetail
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/tasks/%s", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
+		return domain.TaskDetail{}, err
+	}
+	return payload, nil
+}
+
 func (c *APIClient) ListTasks(ctx context.Context, projectID string, status string, epicID string) (domain.TaskListResponse, error) {
 	endpoint := *c.baseURL
 	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "tasks")
@@ -184,6 +225,46 @@ func (c *APIClient) ListTasks(ctx context.Context, projectID string, status stri
 		return domain.TaskListResponse{}, fmt.Errorf("decode task list response: %w", err)
 	}
 
+	return payload, nil
+}
+
+func (c *APIClient) ListSubtasks(ctx context.Context, projectID string, taskID string) (domain.TaskListResponse, error) {
+	var payload domain.TaskListResponse
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/subtasks", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
+		return domain.TaskListResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) ListComments(ctx context.Context, projectID string, taskID string) (domain.CommentListResponse, error) {
+	var payload domain.CommentListResponse
+	if err := c.doJSON(ctx, http.MethodGet, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/comments", url.PathEscape(projectID), url.PathEscape(taskID)), nil, &payload); err != nil {
+		return domain.CommentListResponse{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) AddComment(ctx context.Context, projectID string, taskID string, req domain.CommentCreateRequest) (domain.Comment, error) {
+	var payload domain.Comment
+	if err := c.doJSON(ctx, http.MethodPost, fmt.Sprintf("/api/v1/projects/%s/tasks/%s/comments", url.PathEscape(projectID), url.PathEscape(taskID)), req, &payload); err != nil {
+		return domain.Comment{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) UpdateComment(ctx context.Context, projectID string, commentID string, req domain.CommentUpdateRequest) (domain.Comment, error) {
+	var payload domain.Comment
+	if err := c.doJSON(ctx, http.MethodPatch, fmt.Sprintf("/api/v1/projects/%s/comments/%s", url.PathEscape(projectID), url.PathEscape(commentID)), req, &payload); err != nil {
+		return domain.Comment{}, err
+	}
+	return payload, nil
+}
+
+func (c *APIClient) DeleteComment(ctx context.Context, projectID string, commentID string) (domain.Comment, error) {
+	var payload domain.Comment
+	if err := c.doJSON(ctx, http.MethodDelete, fmt.Sprintf("/api/v1/projects/%s/comments/%s", url.PathEscape(projectID), url.PathEscape(commentID)), nil, &payload); err != nil {
+		return domain.Comment{}, err
+	}
 	return payload, nil
 }
 

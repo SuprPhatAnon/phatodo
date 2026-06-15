@@ -72,3 +72,16 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 	require.Contains(t, buf.String(), "dependents[1]{id,title,status,priority}:\n")
 	require.Contains(t, buf.String(), "    - CORE-5,Backups,todo,1\n")
 }
+
+func TestWriteCommentTOON(t *testing.T) {
+	var buf bytes.Buffer
+
+	writeComment(&buf, 0, domain.Comment{
+		ID:      "cmt-1",
+		Author:  "agent",
+		Kind:    "summary",
+		Content: "Done",
+	})
+
+	require.Equal(t, "- id: cmt-1\n  author: agent\n  kind: summary\n  content: Done\n", buf.String())
+}

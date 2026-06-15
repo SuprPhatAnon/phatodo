@@ -174,6 +174,268 @@ func (a *app) createTask(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, result)
 }
 
+func (a *app) createSubtask(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskCreator == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	parentTaskID := r.PathValue("taskID")
+	req, err := decodeSubtaskCreateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+	req.ParentTaskID = parentTaskID
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.TaskCreator.CreateTask(r.Context(), projectID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrAssignedUserNotFound):
+			respondError(w, http.StatusNotFound, "assigned_user_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidIssuePrefix):
+			respondError(w, http.StatusBadRequest, "invalid_issue_prefix", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "subtask_create_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) listComments(w http.ResponseWriter, r *http.Request) {
+	if a.config.CommentLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "comment_store_unavailable", "comment store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	result, err := a.config.CommentLister.ListComments(r.Context(), projectID, taskID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "comment_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) createComment(w http.ResponseWriter, r *http.Request) {
+	if a.config.CommentCreator == nil {
+		respondError(w, http.StatusServiceUnavailable, "comment_store_unavailable", "comment store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	req, err := decodeCommentCreateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.CommentCreator.CreateComment(r.Context(), projectID, taskID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "comment_create_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, result)
+}
+
+func (a *app) updateComment(w http.ResponseWriter, r *http.Request) {
+	if a.config.CommentUpdater == nil {
+		respondError(w, http.StatusServiceUnavailable, "comment_store_unavailable", "comment store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	commentID := r.PathValue("commentID")
+	req, err := decodeCommentUpdateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.CommentUpdater.UpdateComment(r.Context(), projectID, commentID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrCommentNotFound):
+			respondError(w, http.StatusNotFound, "comment_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "comment_update_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) deleteComment(w http.ResponseWriter, r *http.Request) {
+	if a.config.CommentDeleter == nil {
+		respondError(w, http.StatusServiceUnavailable, "comment_store_unavailable", "comment store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	commentID := r.PathValue("commentID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.CommentDeleter.DeleteComment(r.Context(), projectID, commentID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrCommentNotFound):
+			respondError(w, http.StatusNotFound, "comment_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "comment_delete_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) showTask(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskReader == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	result, err := a.config.TaskReader.GetTask(r.Context(), projectID, taskID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "task_show_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) listSubtasks(w http.ResponseWriter, r *http.Request) {
+	if a.config.SubtaskLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	parentTaskID := r.PathValue("taskID")
+
+	result, err := a.config.SubtaskLister.ListSubtasks(r.Context(), projectID, parentTaskID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "subtask_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) updateTask(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskUpdater == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+	req, err := decodeTaskUpdateRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.TaskUpdater.UpdateTask(r.Context(), projectID, taskID, req, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrEpicNotFound):
+			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrAssignedUserNotFound):
+			respondError(w, http.StatusNotFound, "assigned_user_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidIssuePrefix):
+			respondError(w, http.StatusBadRequest, "invalid_issue_prefix", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "task_update_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) deleteTask(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskDeleter == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	taskID := r.PathValue("taskID")
+
+	actor, _ := principalFromContext(r.Context())
+	result, err := a.config.TaskDeleter.DeleteTask(r.Context(), projectID, taskID, actor.UserID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		case errors.Is(err, postgres.ErrTaskNotFound):
+			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "task_delete_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 func (a *app) listTasks(w http.ResponseWriter, r *http.Request) {
 	if a.config.TaskLister == nil {
 		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
@@ -364,6 +626,71 @@ func decodeTaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error) {
 	}
 	if req.IssuePrefix == "" {
 		return domain.TaskCreateRequest{}, errors.New("issue_prefix is required")
+	}
+	return req, nil
+}
+
+func decodeSubtaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error) {
+	var req domain.TaskCreateRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.TaskCreateRequest{}, err
+	}
+	if req.Title == "" {
+		return domain.TaskCreateRequest{}, errors.New("title is required")
+	}
+	return req, nil
+}
+
+func decodeCommentCreateRequest(body io.Reader) (domain.CommentCreateRequest, error) {
+	var req domain.CommentCreateRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.CommentCreateRequest{}, err
+	}
+	if req.Author == "" {
+		return domain.CommentCreateRequest{}, errors.New("author is required")
+	}
+	if req.Content == "" {
+		return domain.CommentCreateRequest{}, errors.New("content is required")
+	}
+	if req.Kind == "" {
+		req.Kind = "comment"
+	}
+	switch req.Kind {
+	case "comment", "analysis", "summary", "checkpoint", "handoff":
+	default:
+		return domain.CommentCreateRequest{}, errors.New("kind must be comment, analysis, summary, checkpoint, or handoff")
+	}
+	return req, nil
+}
+
+func decodeCommentUpdateRequest(body io.Reader) (domain.CommentUpdateRequest, error) {
+	var req domain.CommentUpdateRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.CommentUpdateRequest{}, err
+	}
+	if req.Content == "" {
+		return domain.CommentUpdateRequest{}, errors.New("content is required")
+	}
+	return req, nil
+}
+
+func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
+	var req domain.TaskUpdateRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.TaskUpdateRequest{}, err
+	}
+	if req.Title == nil &&
+		req.Description == nil &&
+		req.Priority == nil &&
+		req.Status == nil &&
+		req.Tags == nil &&
+		req.EpicID == nil &&
+		!req.NoEpic &&
+		req.AssignedTo == nil &&
+		req.AcceptanceCriteria == nil &&
+		req.CompletionSummary == nil &&
+		req.CompletionEvidence == nil {
+		return domain.TaskUpdateRequest{}, errors.New("at least one field must be provided")
 	}
 	return req, nil
 }

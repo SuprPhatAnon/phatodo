@@ -18,17 +18,17 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo epic delete`
 - [x] `ptodo task create`
 - [x] `ptodo task list`
-- [ ] `ptodo task show`
-- [ ] `ptodo task update`
-- [ ] `ptodo task delete`
-- [ ] `ptodo subtask create`
-- [ ] `ptodo subtask list`
-- [ ] `ptodo subtask update`
-- [ ] `ptodo subtask delete`
-- [ ] `ptodo comment add`
-- [ ] `ptodo comment list`
-- [ ] `ptodo comment update`
-- [ ] `ptodo comment delete`
+- [x] `ptodo task show`
+- [x] `ptodo task update`
+- [x] `ptodo task delete`
+- [x] `ptodo subtask create`
+- [x] `ptodo subtask list`
+- [x] `ptodo subtask update`
+- [x] `ptodo subtask delete`
+- [x] `ptodo comment add`
+- [x] `ptodo comment list`
+- [x] `ptodo comment update`
+- [x] `ptodo comment delete`
 - [ ] `ptodo dep add`
 - [ ] `ptodo dep remove`
 - [ ] `ptodo dep list`
@@ -79,8 +79,8 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
-| `ptodo subtask create` | `POST /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side. |
-| `ptodo subtask list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | None. |
+| `ptodo subtask create` | `POST /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side; the server derives the subtask issue prefix from the parent task. |
+| `ptodo subtask list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks` | `tasks` | None. Returns direct child subtasks for the parent task. |
 | `ptodo subtask update` | `PATCH /api/v1/projects/{projectID}/tasks/{subtaskID}` | `tasks` | `events`, `search_index`. |
 | `ptodo subtask delete` | `DELETE /api/v1/projects/{projectID}/tasks/{subtaskID}` | `tasks` | `comments`, `dependencies`, `events`, `search_index`, and any active `work_item_locks` cleanup. |
 

@@ -20,7 +20,16 @@ type fakeAPIClient struct {
 	setProjectConfigFn   func(context.Context, string, string, string) (ProjectConfigItem, error)
 	unsetProjectConfigFn func(context.Context, string, string) (ProjectConfigItem, error)
 	createTaskFn         func(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	createSubtaskFn      func(context.Context, string, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	getTaskFn            func(context.Context, string, string) (domain.TaskDetail, error)
+	updateTaskFn         func(context.Context, string, string, domain.TaskUpdateRequest) (domain.TaskDetail, error)
+	deleteTaskFn         func(context.Context, string, string) (domain.TaskDetail, error)
 	listTasksFn          func(context.Context, string, string, string) (domain.TaskListResponse, error)
+	listSubtasksFn       func(context.Context, string, string) (domain.TaskListResponse, error)
+	listCommentsFn       func(context.Context, string, string) (domain.CommentListResponse, error)
+	addCommentFn         func(context.Context, string, string, domain.CommentCreateRequest) (domain.Comment, error)
+	updateCommentFn      func(context.Context, string, string, domain.CommentUpdateRequest) (domain.Comment, error)
+	deleteCommentFn      func(context.Context, string, string) (domain.Comment, error)
 	listReadyTasksFn     func(context.Context, string, string) (domain.ReadyListResponse, error)
 	initAdminFn          func(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
 	bootstrapAdminFn     func(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
@@ -46,8 +55,44 @@ func (f *fakeAPIClient) CreateTask(ctx context.Context, projectID string, req do
 	return f.createTaskFn(ctx, projectID, req)
 }
 
+func (f *fakeAPIClient) CreateSubtask(ctx context.Context, projectID, taskID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+	return f.createSubtaskFn(ctx, projectID, taskID, req)
+}
+
+func (f *fakeAPIClient) GetTask(ctx context.Context, projectID, taskID string) (domain.TaskDetail, error) {
+	return f.getTaskFn(ctx, projectID, taskID)
+}
+
+func (f *fakeAPIClient) UpdateTask(ctx context.Context, projectID, taskID string, req domain.TaskUpdateRequest) (domain.TaskDetail, error) {
+	return f.updateTaskFn(ctx, projectID, taskID, req)
+}
+
+func (f *fakeAPIClient) DeleteTask(ctx context.Context, projectID, taskID string) (domain.TaskDetail, error) {
+	return f.deleteTaskFn(ctx, projectID, taskID)
+}
+
 func (f *fakeAPIClient) ListTasks(ctx context.Context, projectID, status, epicID string) (domain.TaskListResponse, error) {
 	return f.listTasksFn(ctx, projectID, status, epicID)
+}
+
+func (f *fakeAPIClient) ListSubtasks(ctx context.Context, projectID, taskID string) (domain.TaskListResponse, error) {
+	return f.listSubtasksFn(ctx, projectID, taskID)
+}
+
+func (f *fakeAPIClient) ListComments(ctx context.Context, projectID, taskID string) (domain.CommentListResponse, error) {
+	return f.listCommentsFn(ctx, projectID, taskID)
+}
+
+func (f *fakeAPIClient) AddComment(ctx context.Context, projectID, taskID string, req domain.CommentCreateRequest) (domain.Comment, error) {
+	return f.addCommentFn(ctx, projectID, taskID, req)
+}
+
+func (f *fakeAPIClient) UpdateComment(ctx context.Context, projectID, commentID string, req domain.CommentUpdateRequest) (domain.Comment, error) {
+	return f.updateCommentFn(ctx, projectID, commentID, req)
+}
+
+func (f *fakeAPIClient) DeleteComment(ctx context.Context, projectID, commentID string) (domain.Comment, error) {
+	return f.deleteCommentFn(ctx, projectID, commentID)
 }
 
 func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
@@ -435,6 +480,536 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "issue_prefix: ABC")
 	require.Contains(t, stdout.String(), "title: \"Write docs\"")
+}
+
+func TestRunSubtaskCreateCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createSubtaskFn: func(ctx context.Context, projectID, taskID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, "Write docs", req.Title)
+				require.Empty(t, req.IssuePrefix)
+				require.Equal(t, []string{"important"}, req.AcceptanceCriteria)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-2",
+					IssuePrefix: "ABC",
+					Title:       "Write docs",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"subtask", "create", "ABC-1", "-t", "Write docs", "--criteria-json", `["important"]`}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-2")
+	require.Contains(t, stdout.String(), "issue_prefix: ABC")
+	require.Contains(t, stdout.String(), "title: \"Write docs\"")
+}
+
+func TestRunTaskShowUsesFakeClient(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			getTaskFn: func(ctx context.Context, projectID, taskID string) (domain.TaskDetail, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				return domain.TaskDetail{
+					ID:         "ABC-1",
+					Title:      "Write docs",
+					Status:     domain.StatusInProgress,
+					Priority:   domain.PriorityMedium,
+					EpicID:     "epic-1",
+					AssignedTo: "usr_1",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"task", "show", "ABC-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "epicId: epic-1")
+	require.Contains(t, stdout.String(), "assignedTo: usr_1")
+}
+
+func TestRunSubtaskListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			listSubtasksFn: func(ctx context.Context, projectID, taskID string) (domain.TaskListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				return domain.TaskListResponse{
+					ProjectID: "default",
+					Items: []domain.TaskListItem{
+						{
+							ID:           "ABC-2",
+							Title:        "Write docs",
+							Status:       domain.StatusTodo,
+							Priority:     domain.PriorityMedium,
+							ParentTaskID: "ABC-1",
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"subtask", "list", "ABC-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "subtasks[1]:")
+	require.Contains(t, stdout.String(), "- id: ABC-2")
+	require.Contains(t, stdout.String(), "parentTaskId: ABC-1")
+}
+
+func TestRunTaskUpdateUsesFakeClient(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			updateTaskFn: func(ctx context.Context, projectID, taskID string, req domain.TaskUpdateRequest) (domain.TaskDetail, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				require.NotNil(t, req.Status)
+				require.Equal(t, domain.StatusInProgress, *req.Status)
+				require.NotNil(t, req.Title)
+				return domain.TaskDetail{
+					ID:       "ABC-1",
+					Title:    "Updated docs",
+					Status:   domain.StatusInProgress,
+					Priority: domain.PriorityHigh,
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"task", "update", "ABC-1", "-t", "Updated docs", "-s", "in_progress"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "title: \"Updated docs\"")
+	require.Contains(t, stdout.String(), "status: in_progress")
+}
+
+func TestRunSubtaskUpdateUsesFakeClient(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			updateTaskFn: func(ctx context.Context, projectID, taskID string, req domain.TaskUpdateRequest) (domain.TaskDetail, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-2", taskID)
+				require.NotNil(t, req.Status)
+				require.Equal(t, domain.StatusCompleted, *req.Status)
+				require.NotNil(t, req.Title)
+				return domain.TaskDetail{
+					ID:     "ABC-2",
+					Title:  "Updated subtask",
+					Status: domain.StatusCompleted,
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"subtask", "update", "ABC-2", "-t", "Updated subtask", "-s", "completed"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-2")
+	require.Contains(t, stdout.String(), "title: \"Updated subtask\"")
+	require.Contains(t, stdout.String(), "status: completed")
+}
+
+func TestRunTaskDeleteUsesFakeClient(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			deleteTaskFn: func(ctx context.Context, projectID, taskID string) (domain.TaskDetail, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				return domain.TaskDetail{
+					ID:     "ABC-1",
+					Title:  "Write docs",
+					Status: domain.StatusArchived,
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"task", "delete", "ABC-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "status: archived")
+}
+
+func TestRunSubtaskDeleteUsesFakeClient(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			deleteTaskFn: func(ctx context.Context, projectID, taskID string) (domain.TaskDetail, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-2", taskID)
+				return domain.TaskDetail{
+					ID:     "ABC-2",
+					Title:  "Write docs",
+					Status: domain.StatusArchived,
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"subtask", "delete", "ABC-2"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-2")
+	require.Contains(t, stdout.String(), "status: archived")
+}
+
+func TestRunCommentAddCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			addCommentFn: func(ctx context.Context, projectID, taskID string, req domain.CommentCreateRequest) (domain.Comment, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, "agent", req.Author)
+				require.Equal(t, "summary", req.Kind)
+				require.Equal(t, "Done", req.Content)
+				return domain.Comment{
+					ID:      "cmt-1",
+					Author:  "agent",
+					Kind:    "summary",
+					Content: "Done",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"comment", "add", "ABC-1", "-a", "agent", "-c", "Done", "-k", "summary"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: cmt-1")
+	require.Contains(t, stdout.String(), "author: agent")
+	require.Contains(t, stdout.String(), "kind: summary")
+	require.Contains(t, stdout.String(), "content: Done")
+}
+
+func TestRunCommentListCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			listCommentsFn: func(ctx context.Context, projectID, taskID string) (domain.CommentListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC-1", taskID)
+				return domain.CommentListResponse{
+					ProjectID: "default",
+					TaskID:    "ABC-1",
+					Items: []domain.Comment{
+						{
+							ID:      "cmt-1",
+							Author:  "agent",
+							Kind:    "analysis",
+							Content: "Working notes",
+						},
+					},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"comment", "list", "ABC-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "comments[1]:")
+	require.Contains(t, stdout.String(), "- id: cmt-1")
+	require.Contains(t, stdout.String(), "kind: analysis")
+}
+
+func TestRunCommentUpdateCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			updateCommentFn: func(ctx context.Context, projectID, commentID string, req domain.CommentUpdateRequest) (domain.Comment, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "cmt-1", commentID)
+				require.Equal(t, "Updated", req.Content)
+				return domain.Comment{
+					ID:      "cmt-1",
+					Author:  "agent",
+					Kind:    "comment",
+					Content: "Updated",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"comment", "update", "cmt-1", "-c", "Updated"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: cmt-1")
+	require.Contains(t, stdout.String(), "content: Updated")
+}
+
+func TestRunCommentDeleteCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			deleteCommentFn: func(ctx context.Context, projectID, commentID string) (domain.Comment, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "cmt-1", commentID)
+				return domain.Comment{
+					ID:      "cmt-1",
+					Author:  "agent",
+					Kind:    "comment",
+					Content: "Deleted",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"comment", "delete", "cmt-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: cmt-1")
+	require.Contains(t, stdout.String(), "content: Deleted")
 }
 
 func TestRunAdminInitCallsServer(t *testing.T) {

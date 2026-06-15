@@ -62,6 +62,7 @@ type Task struct {
 type TaskCreateRequest struct {
 	Title              string    `json:"title"`
 	IssuePrefix        string    `json:"issue_prefix"`
+	ParentTaskID       string    `json:"parent_task_id,omitempty"`
 	Description        string    `json:"description"`
 	Priority           *Priority `json:"priority,omitempty"`
 	EpicID             string    `json:"epic_id"`
@@ -98,6 +99,43 @@ type TaskListResponse struct {
 	Items     []TaskListItem `json:"items"`
 }
 
+type TaskDetail struct {
+	ID                 string    `json:"id"`
+	WorkspaceID        string    `json:"workspace_id,omitempty"`
+	ProjectID          string    `json:"project_id,omitempty"`
+	EpicID             string    `json:"epic_id,omitempty"`
+	ParentTaskID       string    `json:"parent_task_id,omitempty"`
+	AssignedTo         string    `json:"assigned_to,omitempty"`
+	CreatedBy          string    `json:"created_by,omitempty"`
+	UpdatedBy          string    `json:"updated_by,omitempty"`
+	CompletedBy        string    `json:"completed_by,omitempty"`
+	Title              string    `json:"title"`
+	Description        string    `json:"description,omitempty"`
+	Status             Status    `json:"status"`
+	Priority           Priority  `json:"priority"`
+	Tags               []string  `json:"tags,omitempty"`
+	AcceptanceCriteria []string  `json:"acceptance_criteria,omitempty"`
+	CompletionEvidence []string  `json:"completion_evidence,omitempty"`
+	CompletionSummary  string    `json:"completion_summary,omitempty"`
+	CompletedAt        time.Time `json:"completed_at,omitempty"`
+	CreatedAt          time.Time `json:"created_at,omitempty"`
+	UpdatedAt          time.Time `json:"updated_at,omitempty"`
+}
+
+type TaskUpdateRequest struct {
+	Title              *string   `json:"title,omitempty"`
+	Description        *string   `json:"description,omitempty"`
+	Priority           *Priority `json:"priority,omitempty"`
+	Status             *Status   `json:"status,omitempty"`
+	Tags               *[]string `json:"tags,omitempty"`
+	EpicID             *string   `json:"epic_id,omitempty"`
+	NoEpic             bool      `json:"no_epic,omitempty"`
+	AssignedTo         *string   `json:"assigned_to,omitempty"`
+	AcceptanceCriteria *[]string `json:"acceptance_criteria,omitempty"`
+	CompletionSummary  *string   `json:"completion_summary,omitempty"`
+	CompletionEvidence *[]string `json:"completion_evidence,omitempty"`
+}
+
 type ReadyListItem struct {
 	ID           string         `json:"id"`
 	Title        string         `json:"title"`
@@ -130,14 +168,32 @@ type Epic struct {
 }
 
 type Comment struct {
-	ID          string
-	WorkspaceID string
-	ProjectID   string
-	TaskID      string
-	Author      string
-	Content     string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           string    `json:"id"`
+	WorkspaceID  string    `json:"workspace_id,omitempty"`
+	ProjectID    string    `json:"project_id,omitempty"`
+	TaskID       string    `json:"task_id,omitempty"`
+	AuthorUserID string    `json:"author_user_id,omitempty"`
+	Author       string    `json:"author"`
+	Kind         string    `json:"kind"`
+	Content      string    `json:"content"`
+	CreatedAt    time.Time `json:"created_at,omitempty"`
+	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+}
+
+type CommentCreateRequest struct {
+	Author  string `json:"author"`
+	Kind    string `json:"kind"`
+	Content string `json:"content"`
+}
+
+type CommentUpdateRequest struct {
+	Content string `json:"content"`
+}
+
+type CommentListResponse struct {
+	ProjectID string    `json:"project_id"`
+	TaskID    string    `json:"task_id"`
+	Items     []Comment `json:"items"`
 }
 
 type ProjectConfig struct {

@@ -113,6 +113,25 @@ Render:
 - content
 - timestamp
 
+`ptodo comment add <task-id> -a agent -c "Done" -k summary`:
+
+```text
+- id: cmt-1
+  author: agent
+  kind: summary
+  content: Done
+```
+
+`ptodo comment list <task-id>`:
+
+```text
+comments[1]:
+  - id: cmt-1
+    author: agent
+    kind: analysis
+    content: "Working notes"
+```
+
 ### Dependencies
 
 Render:

@@ -55,18 +55,18 @@ func (a *app) registerEpicRoutes(mux *http.ServeMux) {
 func (a *app) registerTaskRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.listTasks)))
 	mux.Handle("POST /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.createTask)))
-	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.show"))))
-	mux.Handle("PATCH /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.update"))))
-	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.delete"))))
-	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks", a.withAPIAuth(http.HandlerFunc(a.notImplemented("subtask.list"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/subtasks", a.withAPIAuth(http.HandlerFunc(a.notImplemented("subtask.create"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.showTask)))
+	mux.Handle("PATCH /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.updateTask)))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.deleteTask)))
+	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/subtasks", a.withAPIAuth(http.HandlerFunc(a.listSubtasks)))
+	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/subtasks", a.withAPIAuth(http.HandlerFunc(a.createSubtask)))
 }
 
 func (a *app) registerCommentRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/comments", a.withAPIAuth(http.HandlerFunc(a.notImplemented("comment.list"))))
-	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/comments", a.withAPIAuth(http.HandlerFunc(a.notImplemented("comment.add"))))
-	mux.Handle("PATCH /api/v1/projects/{projectID}/comments/{commentID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("comment.update"))))
-	mux.Handle("DELETE /api/v1/projects/{projectID}/comments/{commentID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("comment.delete"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}/comments", a.withAPIAuth(http.HandlerFunc(a.listComments)))
+	mux.Handle("POST /api/v1/projects/{projectID}/tasks/{taskID}/comments", a.withAPIAuth(http.HandlerFunc(a.createComment)))
+	mux.Handle("PATCH /api/v1/projects/{projectID}/comments/{commentID}", a.withAPIAuth(http.HandlerFunc(a.updateComment)))
+	mux.Handle("DELETE /api/v1/projects/{projectID}/comments/{commentID}", a.withAPIAuth(http.HandlerFunc(a.deleteComment)))
 }
 
 func (a *app) registerDependencyRoutes(mux *http.ServeMux) {

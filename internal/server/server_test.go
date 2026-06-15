@@ -208,6 +208,15 @@ func (f fakeTaskCreator) CreateTask(_ context.Context, _ string, _ domain.TaskCr
 	return f.createResponse, f.createErr
 }
 
+type fakeSubtaskLister struct {
+	listResponse domain.TaskListResponse
+	listErr      error
+}
+
+func (f fakeSubtaskLister) ListSubtasks(_ context.Context, _ string, _ string) (domain.TaskListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
 type fakeTaskLister struct {
 	listResponse domain.TaskListResponse
 	listErr      error
@@ -215,6 +224,69 @@ type fakeTaskLister struct {
 
 func (f fakeTaskLister) ListTasks(_ context.Context, _ string, _ string, _ string) (domain.TaskListResponse, error) {
 	return f.listResponse, f.listErr
+}
+
+type fakeTaskReader struct {
+	getResponse domain.TaskDetail
+	getErr      error
+}
+
+func (f fakeTaskReader) GetTask(_ context.Context, _ string, _ string) (domain.TaskDetail, error) {
+	return f.getResponse, f.getErr
+}
+
+type fakeTaskUpdater struct {
+	updateResponse domain.TaskDetail
+	updateErr      error
+}
+
+func (f fakeTaskUpdater) UpdateTask(_ context.Context, _ string, _ string, _ domain.TaskUpdateRequest, _ string) (domain.TaskDetail, error) {
+	return f.updateResponse, f.updateErr
+}
+
+type fakeTaskDeleter struct {
+	deleteResponse domain.TaskDetail
+	deleteErr      error
+}
+
+func (f fakeTaskDeleter) DeleteTask(_ context.Context, _ string, _ string, _ string) (domain.TaskDetail, error) {
+	return f.deleteResponse, f.deleteErr
+}
+
+type fakeCommentLister struct {
+	listResponse domain.CommentListResponse
+	listErr      error
+}
+
+func (f fakeCommentLister) ListComments(_ context.Context, _ string, _ string) (domain.CommentListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
+type fakeCommentCreator struct {
+	createResponse domain.Comment
+	createErr      error
+}
+
+func (f fakeCommentCreator) CreateComment(_ context.Context, _ string, _ string, _ domain.CommentCreateRequest, _ string) (domain.Comment, error) {
+	return f.createResponse, f.createErr
+}
+
+type fakeCommentUpdater struct {
+	updateResponse domain.Comment
+	updateErr      error
+}
+
+func (f fakeCommentUpdater) UpdateComment(_ context.Context, _ string, _ string, _ domain.CommentUpdateRequest, _ string) (domain.Comment, error) {
+	return f.updateResponse, f.updateErr
+}
+
+type fakeCommentDeleter struct {
+	deleteResponse domain.Comment
+	deleteErr      error
+}
+
+func (f fakeCommentDeleter) DeleteComment(_ context.Context, _ string, _ string, _ string) (domain.Comment, error) {
+	return f.deleteResponse, f.deleteErr
 }
 
 type fakeReadyLister struct {
@@ -278,6 +350,83 @@ func TestAdminBootstrapReturnsProjectConfig(t *testing.T) {
 	require.Equal(t, "key_1", body["access_key"])
 }
 
+func TestTaskShowReturnsDetail(t *testing.T) {
+	handler := newApp(Config{
+		TaskReader: fakeTaskReader{
+			getResponse: domain.TaskDetail{
+				ID:       "ABC-1",
+				Title:    "Write docs",
+				Status:   domain.StatusTodo,
+				Priority: domain.PriorityMedium,
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks/ABC-1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "ABC-1", body["id"])
+	require.Equal(t, "Write docs", body["title"])
+}
+
+func TestTaskUpdateReturnsDetail(t *testing.T) {
+	handler := newApp(Config{
+		TaskUpdater: fakeTaskUpdater{
+			updateResponse: domain.TaskDetail{
+				ID:       "ABC-1",
+				Title:    "Updated docs",
+				Status:   domain.StatusInProgress,
+				Priority: domain.PriorityHigh,
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/project-1/tasks/ABC-1", strings.NewReader(`{"title":"Updated docs","status":"in_progress"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "Updated docs", body["title"])
+	require.Equal(t, "in_progress", body["status"])
+}
+
+func TestTaskDeleteReturnsDetail(t *testing.T) {
+	handler := newApp(Config{
+		TaskDeleter: fakeTaskDeleter{
+			deleteResponse: domain.TaskDetail{
+				ID:     "ABC-1",
+				Title:  "Write docs",
+				Status: domain.StatusArchived,
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/tasks/ABC-1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "ABC-1", body["id"])
+	require.Equal(t, "archived", body["status"])
+}
+
 func TestTaskCreateReturnsTask(t *testing.T) {
 	handler := newApp(Config{
 		TaskCreator: fakeTaskCreator{
@@ -306,6 +455,38 @@ func TestTaskCreateReturnsTask(t *testing.T) {
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	require.Equal(t, "ABC-1", body["id"])
+	require.Equal(t, "ABC", body["issue_prefix"])
+	require.Equal(t, "Write docs", body["title"])
+}
+
+func TestSubtaskCreateReturnsTask(t *testing.T) {
+	handler := newApp(Config{
+		TaskCreator: fakeTaskCreator{
+			createResponse: domain.TaskCreateResponse{
+				ID:          "ABC-2",
+				IssuePrefix: "ABC",
+				Title:       "Write docs",
+				Status:      domain.StatusTodo,
+				Priority:    domain.PriorityMedium,
+				ProjectID:   "project-1",
+				WorkspaceID: "workspace-1",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/tasks/ABC-1/subtasks", strings.NewReader(`{"title":"Write docs","description":"child"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "ABC-2", body["id"])
 	require.Equal(t, "ABC", body["issue_prefix"])
 	require.Equal(t, "Write docs", body["title"])
 }
@@ -352,6 +533,142 @@ func TestTaskListReturnsItems(t *testing.T) {
 	require.Equal(t, "in_progress", item["status"])
 	require.Equal(t, float64(2), item["priority"])
 	require.Equal(t, "epic-1", item["epic_id"])
+}
+
+func TestSubtaskListReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		SubtaskLister: fakeSubtaskLister{
+			listResponse: domain.TaskListResponse{
+				ProjectID: "project-1",
+				Items: []domain.TaskListItem{
+					{ID: "ABC-2", Title: "Write docs", Status: domain.StatusTodo, Priority: domain.PriorityMedium, ParentTaskID: "ABC-1"},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks/ABC-1/subtasks", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+}
+
+func TestCommentAddReturnsComment(t *testing.T) {
+	handler := newApp(Config{
+		CommentCreator: fakeCommentCreator{
+			createResponse: domain.Comment{
+				ID:      "cmt-1",
+				Author:  "agent",
+				Kind:    "summary",
+				Content: "Done",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/tasks/ABC-1/comments", strings.NewReader(`{"author":"agent","kind":"summary","content":"Done"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "cmt-1", body["id"])
+	require.Equal(t, "agent", body["author"])
+	require.Equal(t, "summary", body["kind"])
+}
+
+func TestCommentListReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		CommentLister: fakeCommentLister{
+			listResponse: domain.CommentListResponse{
+				ProjectID: "project-1",
+				TaskID:    "ABC-1",
+				Items: []domain.Comment{
+					{ID: "cmt-1", Author: "agent", Kind: "analysis", Content: "Working notes"},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks/ABC-1/comments", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+}
+
+func TestCommentUpdateReturnsComment(t *testing.T) {
+	handler := newApp(Config{
+		CommentUpdater: fakeCommentUpdater{
+			updateResponse: domain.Comment{
+				ID:      "cmt-1",
+				Author:  "agent",
+				Kind:    "comment",
+				Content: "Updated",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPatch, "/api/v1/projects/project-1/comments/cmt-1", strings.NewReader(`{"content":"Updated"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "cmt-1", body["id"])
+	require.Equal(t, "Updated", body["content"])
+}
+
+func TestCommentDeleteReturnsComment(t *testing.T) {
+	handler := newApp(Config{
+		CommentDeleter: fakeCommentDeleter{
+			deleteResponse: domain.Comment{
+				ID:      "cmt-1",
+				Author:  "agent",
+				Kind:    "comment",
+				Content: "Deleted",
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/comments/cmt-1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "cmt-1", body["id"])
+	require.Equal(t, "Deleted", body["content"])
 }
 
 func TestReadyReturnsItems(t *testing.T) {

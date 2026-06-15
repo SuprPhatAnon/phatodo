@@ -73,6 +73,39 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 1 && args[0] == "ready" {
 		return runReady(args[1:], stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "subtask" && args[1] == "create" {
+		return runSubtaskCreate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "subtask" && args[1] == "list" {
+		return runSubtaskList(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "subtask" && args[1] == "update" {
+		return runSubtaskUpdate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "subtask" && args[1] == "delete" {
+		return runSubtaskDelete(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "comment" && args[1] == "add" {
+		return runCommentAdd(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "comment" && args[1] == "list" {
+		return runCommentList(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "comment" && args[1] == "update" {
+		return runCommentUpdate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "comment" && args[1] == "delete" {
+		return runCommentDelete(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "task" && args[1] == "show" {
+		return runTaskShow(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "task" && args[1] == "update" {
+		return runTaskUpdate(args[2:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "task" && args[1] == "delete" {
+		return runTaskDelete(args[2:], stdout, stderr)
+	}
 	if len(args) >= 2 && args[0] == "task" && args[1] == "list" {
 		return runTaskList(args[2:], stdout, stderr)
 	}
@@ -296,6 +329,491 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
+func runSubtaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseSubtaskCreateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	priority := domain.Priority(opts.priority)
+	req := domain.TaskCreateRequest{
+		Title:              opts.title,
+		Description:        opts.description,
+		Priority:           &priority,
+		AssignedTo:         opts.assignedTo,
+		AcceptanceCriteria: opts.acceptanceCriteria,
+	}
+
+	resp, err := client.CreateSubtask(context.Background(), cfg.ProjectID, opts.taskID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskCreateResponse(stdout, resp)
+	return 0
+}
+
+func runTaskShow(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo task show <task-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.GetTask(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskDetail(stdout, resp)
+	return 0
+}
+
+func runSubtaskList(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo subtask list <task-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListSubtasks(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "subtasks", len(resp.Items))
+	for _, item := range resp.Items {
+		writeTaskListItem(stdout, 1, item)
+	}
+	return 0
+}
+
+func runTaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseTaskUpdateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	req := domain.TaskUpdateRequest{}
+	if opts.hasTitle {
+		req.Title = &opts.title
+	}
+	if opts.hasDescription {
+		req.Description = &opts.description
+	}
+	if opts.hasPriority {
+		priority := domain.Priority(opts.priority)
+		req.Priority = &priority
+	}
+	if opts.hasStatus {
+		status := domain.Status(opts.status)
+		req.Status = &status
+	}
+	if opts.hasTags {
+		tags := parseCSVList(opts.tagsValue)
+		req.Tags = &tags
+	}
+	if opts.noEpic {
+		req.NoEpic = true
+	} else if opts.hasEpicID {
+		req.EpicID = &opts.epicID
+	}
+	if opts.hasAssignedTo {
+		req.AssignedTo = &opts.assignedTo
+	}
+	if opts.hasCriteriaJSON {
+		criteria, err := parseJSONStringList(opts.criteriaJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.AcceptanceCriteria = &criteria
+	}
+	if opts.hasSummary {
+		req.CompletionSummary = &opts.summary
+	}
+	if opts.hasEvidenceJSON {
+		evidence, err := parseJSONStringList(opts.evidenceJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.CompletionEvidence = &evidence
+	}
+
+	resp, err := client.UpdateTask(context.Background(), cfg.ProjectID, opts.taskID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskDetail(stdout, resp)
+	return 0
+}
+
+func runSubtaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseSubtaskUpdateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	req := domain.TaskUpdateRequest{}
+	if opts.hasTitle {
+		req.Title = &opts.title
+	}
+	if opts.hasDescription {
+		req.Description = &opts.description
+	}
+	if opts.hasPriority {
+		priority := domain.Priority(opts.priority)
+		req.Priority = &priority
+	}
+	if opts.hasStatus {
+		status := domain.Status(opts.status)
+		req.Status = &status
+	}
+	if opts.hasAssignedTo {
+		req.AssignedTo = &opts.assignedTo
+	}
+	if opts.hasCriteriaJSON {
+		criteria, err := parseJSONStringList(opts.criteriaJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.AcceptanceCriteria = &criteria
+	}
+	if opts.hasSummary {
+		req.CompletionSummary = &opts.summary
+	}
+	if opts.hasEvidenceJSON {
+		evidence, err := parseJSONStringList(opts.evidenceJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.CompletionEvidence = &evidence
+	}
+
+	resp, err := client.UpdateTask(context.Background(), cfg.ProjectID, opts.taskID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskDetail(stdout, resp)
+	return 0
+}
+
+func runTaskDelete(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo task delete <task-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.DeleteTask(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskDetail(stdout, resp)
+	return 0
+}
+
+func runSubtaskDelete(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo subtask delete <subtask-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.DeleteTask(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTaskDetail(stdout, resp)
+	return 0
+}
+
+func runCommentAdd(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseCommentAddArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	req := domain.CommentCreateRequest{
+		Author:  opts.author,
+		Kind:    opts.kind,
+		Content: opts.content,
+	}
+
+	resp, err := client.AddComment(context.Background(), cfg.ProjectID, opts.taskID, req)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeComment(stdout, 0, resp)
+	return 0
+}
+
+func runCommentList(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo comment list <task-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListComments(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeTOONArrayHeader(stdout, 0, "comments", len(resp.Items))
+	for _, item := range resp.Items {
+		writeComment(stdout, 1, item)
+	}
+	return 0
+}
+
+func runCommentUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseCommentUpdateArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.UpdateComment(context.Background(), cfg.ProjectID, opts.commentID, domain.CommentUpdateRequest{Content: opts.content})
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeComment(stdout, 0, resp)
+	return 0
+}
+
+func runCommentDelete(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: ptodo comment delete <comment-id>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := newAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.DeleteComment(context.Background(), cfg.ProjectID, args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	writeComment(stdout, 0, resp)
+	return 0
+}
+
 func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 	opts, err := parseTaskListArgs(args)
 	if err != nil {
@@ -332,6 +850,262 @@ func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 		writeTaskListItem(stdout, 1, item)
 	}
 	return 0
+}
+
+type taskUpdateOptions struct {
+	taskID          string
+	title           string
+	description     string
+	priority        int
+	status          string
+	tagsValue       string
+	epicID          string
+	noEpic          bool
+	assignedTo      string
+	criteriaJSON    string
+	summary         string
+	evidenceJSON    string
+	hasTitle        bool
+	hasDescription  bool
+	hasPriority     bool
+	hasStatus       bool
+	hasTags         bool
+	hasEpicID       bool
+	hasAssignedTo   bool
+	hasCriteriaJSON bool
+	hasSummary      bool
+	hasEvidenceJSON bool
+}
+
+func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
+	fs := flag.NewFlagSet("task update", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts taskUpdateOptions
+	fs.StringVar(&opts.title, "t", "", "")
+	fs.StringVar(&opts.title, "title", "", "")
+	fs.StringVar(&opts.description, "d", "", "")
+	fs.StringVar(&opts.description, "description", "", "")
+	fs.IntVar(&opts.priority, "p", int(domain.PriorityMedium), "")
+	fs.IntVar(&opts.priority, "priority", int(domain.PriorityMedium), "")
+	fs.StringVar(&opts.status, "s", "", "")
+	fs.StringVar(&opts.status, "status", "", "")
+	fs.StringVar(&opts.tagsValue, "tags", "", "")
+	fs.StringVar(&opts.epicID, "e", "", "")
+	fs.StringVar(&opts.epicID, "epic", "", "")
+	fs.BoolVar(&opts.noEpic, "no-epic", false, "")
+	fs.StringVar(&opts.assignedTo, "a", "", "")
+	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
+	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
+	fs.StringVar(&opts.summary, "summary", "", "")
+	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
+
+	if len(args) == 0 {
+		return taskUpdateOptions{}, fmt.Errorf("task update requires <task-id>")
+	}
+	opts.taskID = args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return taskUpdateOptions{}, fmt.Errorf("invalid task update flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return taskUpdateOptions{}, fmt.Errorf("task update does not accept positional arguments after <task-id>")
+	}
+
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "t", "title":
+			opts.hasTitle = true
+		case "d", "description":
+			opts.hasDescription = true
+		case "p", "priority":
+			opts.hasPriority = true
+		case "s", "status":
+			opts.hasStatus = true
+		case "tags":
+			opts.hasTags = true
+		case "e", "epic":
+			opts.hasEpicID = true
+		case "a", "assigned-to":
+			opts.hasAssignedTo = true
+		case "criteria-json":
+			opts.hasCriteriaJSON = true
+		case "summary":
+			opts.hasSummary = true
+		case "evidence-json":
+			opts.hasEvidenceJSON = true
+		}
+	})
+
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasTags && !opts.hasEpicID && !opts.noEpic && !opts.hasAssignedTo && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+		return taskUpdateOptions{}, fmt.Errorf("task update requires at least one change flag")
+	}
+	if opts.noEpic && opts.hasEpicID {
+		return taskUpdateOptions{}, fmt.Errorf("task update cannot combine --no-epic with -e/--epic")
+	}
+	if opts.hasStatus && !isAllowedTaskStatus(opts.status) {
+		return taskUpdateOptions{}, fmt.Errorf("task update status must be todo, in_progress, completed, wont_fix, or archived")
+	}
+
+	return opts, nil
+}
+
+type subtaskUpdateOptions struct {
+	taskID          string
+	title           string
+	description     string
+	priority        int
+	status          string
+	assignedTo      string
+	criteriaJSON    string
+	summary         string
+	evidenceJSON    string
+	hasTitle        bool
+	hasDescription  bool
+	hasPriority     bool
+	hasStatus       bool
+	hasAssignedTo   bool
+	hasCriteriaJSON bool
+	hasSummary      bool
+	hasEvidenceJSON bool
+}
+
+func parseSubtaskUpdateArgs(args []string) (subtaskUpdateOptions, error) {
+	fs := flag.NewFlagSet("subtask update", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var opts subtaskUpdateOptions
+	fs.StringVar(&opts.title, "t", "", "")
+	fs.StringVar(&opts.title, "title", "", "")
+	fs.StringVar(&opts.description, "d", "", "")
+	fs.StringVar(&opts.description, "description", "", "")
+	fs.IntVar(&opts.priority, "p", int(domain.PriorityMedium), "")
+	fs.IntVar(&opts.priority, "priority", int(domain.PriorityMedium), "")
+	fs.StringVar(&opts.status, "s", "", "")
+	fs.StringVar(&opts.status, "status", "", "")
+	fs.StringVar(&opts.assignedTo, "a", "", "")
+	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
+	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
+	fs.StringVar(&opts.summary, "summary", "", "")
+	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
+
+	if len(args) == 0 {
+		return subtaskUpdateOptions{}, fmt.Errorf("subtask update requires <subtask-id>")
+	}
+	opts.taskID = args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return subtaskUpdateOptions{}, fmt.Errorf("invalid subtask update flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return subtaskUpdateOptions{}, fmt.Errorf("subtask update does not accept positional arguments after <subtask-id>")
+	}
+
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "t", "title":
+			opts.hasTitle = true
+		case "d", "description":
+			opts.hasDescription = true
+		case "p", "priority":
+			opts.hasPriority = true
+		case "s", "status":
+			opts.hasStatus = true
+		case "a", "assigned-to":
+			opts.hasAssignedTo = true
+		case "criteria-json":
+			opts.hasCriteriaJSON = true
+		case "summary":
+			opts.hasSummary = true
+		case "evidence-json":
+			opts.hasEvidenceJSON = true
+		}
+	})
+
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasAssignedTo && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+		return subtaskUpdateOptions{}, fmt.Errorf("subtask update requires at least one change flag")
+	}
+	if opts.hasStatus && !isAllowedTaskStatus(opts.status) {
+		return subtaskUpdateOptions{}, fmt.Errorf("subtask update status must be todo, in_progress, completed, wont_fix, or archived")
+	}
+
+	return opts, nil
+}
+
+type commentAddOptions struct {
+	taskID  string
+	author  string
+	kind    string
+	content string
+}
+
+func parseCommentAddArgs(args []string) (commentAddOptions, error) {
+	fs := flag.NewFlagSet("comment add", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var author string
+	var kind string
+	var content string
+	fs.StringVar(&author, "a", "", "")
+	fs.StringVar(&author, "author", "", "")
+	fs.StringVar(&kind, "k", "comment", "")
+	fs.StringVar(&kind, "kind", "comment", "")
+	fs.StringVar(&content, "c", "", "")
+	fs.StringVar(&content, "content", "", "")
+
+	if len(args) == 0 {
+		return commentAddOptions{}, fmt.Errorf("comment add requires <task-id>")
+	}
+	taskID := args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return commentAddOptions{}, fmt.Errorf("invalid comment add flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return commentAddOptions{}, fmt.Errorf("comment add does not accept positional arguments after <task-id>")
+	}
+	if author == "" {
+		return commentAddOptions{}, fmt.Errorf("comment add requires -a <author>")
+	}
+	if content == "" {
+		return commentAddOptions{}, fmt.Errorf("comment add requires -c <content>")
+	}
+	if !isAllowedCommentKind(kind) {
+		return commentAddOptions{}, fmt.Errorf("comment add kind must be comment, analysis, summary, checkpoint, or handoff")
+	}
+
+	return commentAddOptions{taskID: taskID, author: author, kind: kind, content: content}, nil
+}
+
+type commentUpdateOptions struct {
+	commentID string
+	content   string
+}
+
+func parseCommentUpdateArgs(args []string) (commentUpdateOptions, error) {
+	fs := flag.NewFlagSet("comment update", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var content string
+	fs.StringVar(&content, "c", "", "")
+	fs.StringVar(&content, "content", "", "")
+
+	if len(args) == 0 {
+		return commentUpdateOptions{}, fmt.Errorf("comment update requires <comment-id>")
+	}
+	commentID := args[0]
+
+	if err := fs.Parse(args[1:]); err != nil {
+		return commentUpdateOptions{}, fmt.Errorf("invalid comment update flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return commentUpdateOptions{}, fmt.Errorf("comment update does not accept positional arguments after <comment-id>")
+	}
+	if content == "" {
+		return commentUpdateOptions{}, fmt.Errorf("comment update requires -c <content>")
+	}
+
+	return commentUpdateOptions{commentID: commentID, content: content}, nil
 }
 
 func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
@@ -441,6 +1215,64 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	}, nil
 }
 
+type subtaskCreateOptions struct {
+	taskID             string
+	title              string
+	description        string
+	priority           int
+	assignedTo         string
+	acceptanceCriteria []string
+}
+
+func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
+	fs := flag.NewFlagSet("subtask create", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var title string
+	var description string
+	var assignedTo string
+	var criteriaJSON string
+	priority := int(domain.PriorityMedium)
+
+	fs.StringVar(&title, "t", "", "")
+	fs.StringVar(&title, "title", "", "")
+	fs.StringVar(&description, "d", "", "")
+	fs.StringVar(&description, "description", "", "")
+	fs.IntVar(&priority, "p", int(domain.PriorityMedium), "")
+	fs.IntVar(&priority, "priority", int(domain.PriorityMedium), "")
+	fs.StringVar(&assignedTo, "a", "", "")
+	fs.StringVar(&assignedTo, "assigned-to", "", "")
+	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
+
+	if len(args) == 0 {
+		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires <task-id>")
+	}
+	taskID := args[0]
+	if err := fs.Parse(args[1:]); err != nil {
+		return subtaskCreateOptions{}, fmt.Errorf("invalid subtask create flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return subtaskCreateOptions{}, fmt.Errorf("subtask create does not accept positional arguments after <task-id>")
+	}
+	if title == "" {
+		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires -t <title>")
+	}
+
+	criteria, err := parseJSONStringList(criteriaJSON)
+	if err != nil {
+		return subtaskCreateOptions{}, err
+	}
+
+	return subtaskCreateOptions{
+		taskID:             taskID,
+		title:              title,
+		description:        description,
+		priority:           priority,
+		assignedTo:         assignedTo,
+		acceptanceCriteria: criteria,
+	}, nil
+}
+
 func parseCSVList(value string) []string {
 	if strings.TrimSpace(value) == "" {
 		return nil
@@ -469,6 +1301,15 @@ func parseJSONStringList(value string) ([]string, error) {
 func isAllowedTaskStatus(value string) bool {
 	switch domain.Status(value) {
 	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedCommentKind(value string) bool {
+	switch value {
+	case "comment", "analysis", "summary", "checkpoint", "handoff":
 		return true
 	default:
 		return false

@@ -14,6 +14,14 @@ type Config struct {
 	ProjectConfigWriter ProjectConfigWriter
 	TaskCreator         TaskCreator
 	TaskLister          TaskLister
+	SubtaskLister       SubtaskLister
+	TaskReader          TaskReader
+	TaskUpdater         TaskUpdater
+	TaskDeleter         TaskDeleter
+	CommentLister       CommentLister
+	CommentCreator      CommentCreator
+	CommentUpdater      CommentUpdater
+	CommentDeleter      CommentDeleter
 	ReadyLister         ReadyLister
 	BootstrapManager    BootstrapManager
 }
@@ -34,6 +42,38 @@ type TaskCreator interface {
 
 type TaskLister interface {
 	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
+}
+
+type SubtaskLister interface {
+	ListSubtasks(context.Context, string, string) (domain.TaskListResponse, error)
+}
+
+type TaskReader interface {
+	GetTask(context.Context, string, string) (domain.TaskDetail, error)
+}
+
+type TaskUpdater interface {
+	UpdateTask(context.Context, string, string, domain.TaskUpdateRequest, string) (domain.TaskDetail, error)
+}
+
+type TaskDeleter interface {
+	DeleteTask(context.Context, string, string, string) (domain.TaskDetail, error)
+}
+
+type CommentLister interface {
+	ListComments(context.Context, string, string) (domain.CommentListResponse, error)
+}
+
+type CommentCreator interface {
+	CreateComment(context.Context, string, string, domain.CommentCreateRequest, string) (domain.Comment, error)
+}
+
+type CommentUpdater interface {
+	UpdateComment(context.Context, string, string, domain.CommentUpdateRequest, string) (domain.Comment, error)
+}
+
+type CommentDeleter interface {
+	DeleteComment(context.Context, string, string, string) (domain.Comment, error)
 }
 
 type ReadyLister interface {

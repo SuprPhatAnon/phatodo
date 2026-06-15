@@ -24,6 +24,14 @@ func main() {
 	var projectConfigWriter server.ProjectConfigWriter
 	var taskCreator server.TaskCreator
 	var taskLister server.TaskLister
+	var subtaskLister server.SubtaskLister
+	var taskReader server.TaskReader
+	var taskUpdater server.TaskUpdater
+	var taskDeleter server.TaskDeleter
+	var commentLister server.CommentLister
+	var commentCreator server.CommentCreator
+	var commentUpdater server.CommentUpdater
+	var commentDeleter server.CommentDeleter
 	var readyLister server.ReadyLister
 	var bootstrapManager server.BootstrapManager
 	if postgresDSN != "" {
@@ -37,6 +45,14 @@ func main() {
 		projectConfigWriter = store
 		taskCreator = store
 		taskLister = store
+		subtaskLister = store
+		taskReader = store
+		taskUpdater = store
+		taskDeleter = store
+		commentLister = store
+		commentCreator = store
+		commentUpdater = store
+		commentDeleter = store
 		readyLister = store
 		bootstrapManager = store
 	}
@@ -48,6 +64,14 @@ func main() {
 		ProjectConfigWriter: projectConfigWriter,
 		TaskCreator:         taskCreator,
 		TaskLister:          taskLister,
+		SubtaskLister:       subtaskLister,
+		TaskReader:          taskReader,
+		TaskUpdater:         taskUpdater,
+		TaskDeleter:         taskDeleter,
+		CommentLister:       commentLister,
+		CommentCreator:      commentCreator,
+		CommentUpdater:      commentUpdater,
+		CommentDeleter:      commentDeleter,
 		ReadyLister:         readyLister,
 		BootstrapManager:    bootstrapManager,
 	})

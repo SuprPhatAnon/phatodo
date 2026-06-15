@@ -29,13 +29,13 @@ Initial route groups:
 - `GET|PATCH|DELETE /api/v1/projects/{projectID}`
 - `/epics` for epic list/create/show/update/complete/delete
 - `/tasks` for task list/create/show/update/delete; `GET /tasks` returns top-level tasks and supports `status` and `epic` filters, while task create accepts `issue_prefix` so the server can generate the task ID from the command input
-- `/tasks/{taskID}/subtasks` for subtask list/create
+- `/tasks/{taskID}/subtasks` for subtask list/create, using the parent task to scope child rows and derive the child issue prefix
 - `/tasks/{taskID}/comments` and `/comments/{commentID}`
 - `/tasks/{taskID}/dependencies`
 - `/config`, `/search`, `/history`, `/list`, and `/ready`
 - `/locks` for work-item lease acquire/release/list
 
-Most handlers still return structured `501 not_implemented` responses, but the config routes, admin bootstrap routes, the task create/list routes, and the ready route are now wired to the Postgres store. This lets the CLI and tests stabilize around URL shape while the remaining command surface is filled in.
+Most handlers still return structured `501 not_implemented` responses, but the config routes, admin bootstrap routes, the task create/list/show/update/delete routes, the subtask create/list routes, the comment routes, and the ready route are now wired to the Postgres store. This lets the CLI and tests stabilize around URL shape while the remaining command surface is filled in.
 
 Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, comment kind, and audit metadata.
 

@@ -76,6 +76,13 @@ func writeTOONRow(w io.Writer, indent int, values ...string) {
 	fmt.Fprintf(w, "%s- %s\n", toonIndent(indent), strings.Join(parts, ","))
 }
 
+func writeTOONStringArray(w io.Writer, indent int, key string, values []string) {
+	writeTOONArrayHeader(w, indent, key, len(values))
+	for _, value := range values {
+		fmt.Fprintf(w, "%s- %s\n", toonIndent(indent+1), toonScalar(value))
+	}
+}
+
 func writeProjectConfigItem(w io.Writer, item ProjectConfigItem) {
 	writeTOONListItemStart(w, 0, item.Key, item.Value)
 }
@@ -139,4 +146,54 @@ func writeReadyListItem(w io.Writer, indent int, item domain.ReadyListItem) {
 			writeTOONRow(w, indent+2, blocked.ID, blocked.Title, string(blocked.Status), strconv.Itoa(int(blocked.Priority)))
 		}
 	}
+}
+
+func writeTaskDetail(w io.Writer, item domain.TaskDetail) {
+	writeTOONListItemStart(w, 0, "id", item.ID)
+	writeTOONField(w, 1, "title", item.Title)
+	writeTOONField(w, 1, "description", item.Description)
+	writeTOONIntField(w, 1, "priority", int(item.Priority))
+	writeTOONField(w, 1, "status", string(item.Status))
+	if item.EpicID != "" {
+		writeTOONField(w, 1, "epicId", item.EpicID)
+	}
+	if item.ParentTaskID != "" {
+		writeTOONField(w, 1, "parentTaskId", item.ParentTaskID)
+	}
+	if item.AssignedTo != "" {
+		writeTOONField(w, 1, "assignedTo", item.AssignedTo)
+	}
+	if item.CreatedBy != "" {
+		writeTOONField(w, 1, "createdBy", item.CreatedBy)
+	}
+	if item.UpdatedBy != "" {
+		writeTOONField(w, 1, "updatedBy", item.UpdatedBy)
+	}
+	if item.CompletedBy != "" {
+		writeTOONField(w, 1, "completedBy", item.CompletedBy)
+	}
+	if len(item.Tags) > 0 {
+		writeTOONQuotedField(w, 1, "tags", strings.Join(item.Tags, ","))
+	}
+	if len(item.AcceptanceCriteria) > 0 {
+		writeTOONStringArray(w, 1, "acceptanceCriteria", item.AcceptanceCriteria)
+	}
+	if len(item.CompletionEvidence) > 0 {
+		writeTOONStringArray(w, 1, "completionEvidence", item.CompletionEvidence)
+	}
+	if item.CompletionSummary != "" {
+		writeTOONField(w, 1, "completionSummary", item.CompletionSummary)
+	}
+	writeTOONTimeField(w, 1, "completedAt", item.CompletedAt)
+	writeTOONTimeField(w, 1, "createdAt", item.CreatedAt)
+	writeTOONTimeField(w, 1, "updatedAt", item.UpdatedAt)
+}
+
+func writeComment(w io.Writer, indent int, item domain.Comment) {
+	writeTOONListItemStart(w, indent, "id", item.ID)
+	writeTOONField(w, indent+1, "author", item.Author)
+	writeTOONField(w, indent+1, "kind", item.Kind)
+	writeTOONField(w, indent+1, "content", item.Content)
+	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
+	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
 }
