@@ -50,7 +50,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
 | `ptodo admin init` | `POST /api/v1/admin/init` | `users` | Creates the first admin user only; fails if any admin user already exists. |
-| `ptodo admin bootstrap` | `POST /api/v1/admin/bootstrap` | `workspaces`, `projects`, `users`, `user_project_access`, `project_config` | Creates the bootstrap workspace/project, the project-scoped CLI identity, and writes `<repo>/.phatodo/config.json`. Fails if project config already exists. |
+| `ptodo admin bootstrap` | `POST /api/v1/admin/bootstrap` | `workspaces`, `projects`, `users`, `user_project_access` | Creates the bootstrap workspace/project, the project-scoped CLI identity, and writes `<repo>/.phatodo/config.json`. Fails if the target project already exists. |
 | `ptodo wipe -y` | none | none | Removes local client state only. |
 
 ## Epics
@@ -68,7 +68,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
-| `ptodo task create` | `POST /api/v1/projects/{projectID}/tasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side. |
+| `ptodo task create` | `POST /api/v1/projects/{projectID}/tasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side; `issue_prefix` must be supplied in the create payload. |
 | `ptodo task list` | `GET /api/v1/projects/{projectID}/tasks` | `tasks` | May read `search_index` for filters. |
 | `ptodo task show` | `GET /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | None. |
 | `ptodo task update` | `PATCH /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | `events`, `search_index`. |

@@ -95,7 +95,7 @@ func TestRunConfigListFetchesProjectConfig(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"project_id": "default",
 			"items": []map[string]string{
-				{"key": "issue_prefix", "value": "ABC"},
+				{"key": "theme", "value": "dark"},
 			},
 		})
 	}))
@@ -113,7 +113,7 @@ func TestRunConfigListFetchesProjectConfig(t *testing.T) {
 
 	code := Run([]string{"config", "list"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+	require.Contains(t, stdout.String(), "theme=dark")
 }
 
 func TestRunConfigSetCallsServer(t *testing.T) {
@@ -130,17 +130,17 @@ func TestRunConfigSetCallsServer(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/issue_prefix", r.URL.Path)
+		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
 		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
 		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
 
 		var body map[string]string
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		require.Equal(t, "ABC", body["value"])
+		require.Equal(t, "dark", body["value"])
 
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "issue_prefix",
-			"value": "ABC",
+			"key":   "theme",
+			"value": "dark",
 		})
 	}))
 	t.Cleanup(server.Close)
@@ -155,9 +155,9 @@ func TestRunConfigSetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "set", "issue_prefix", "ABC"}, &stdout, &stderr)
+	code := Run([]string{"config", "set", "theme", "dark"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+	require.Contains(t, stdout.String(), "theme=dark")
 }
 
 func TestRunConfigGetCallsServer(t *testing.T) {
@@ -174,13 +174,13 @@ func TestRunConfigGetCallsServer(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/issue_prefix", r.URL.Path)
+		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
 		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
 		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
 
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "issue_prefix",
-			"value": "ABC",
+			"key":   "theme",
+			"value": "dark",
 		})
 	}))
 	t.Cleanup(server.Close)
@@ -195,9 +195,9 @@ func TestRunConfigGetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "get", "issue_prefix"}, &stdout, &stderr)
+	code := Run([]string{"config", "get", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+	require.Contains(t, stdout.String(), "theme=dark")
 }
 
 func TestRunConfigUnsetCallsServer(t *testing.T) {
@@ -214,13 +214,13 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodDelete, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/issue_prefix", r.URL.Path)
+		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
 		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
 		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
 
 		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "issue_prefix",
-			"value": "ABC",
+			"key":   "theme",
+			"value": "dark",
 		})
 	}))
 	t.Cleanup(server.Close)
@@ -235,9 +235,9 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 	_, err = config.WriteLocal(workdir, cfg)
 	require.NoError(t, err)
 
-	code := Run([]string{"config", "unset", "issue_prefix"}, &stdout, &stderr)
+	code := Run([]string{"config", "unset", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+	require.Contains(t, stdout.String(), "theme=dark")
 }
 
 func TestRunAdminInitCallsServer(t *testing.T) {
@@ -309,7 +309,6 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	require.Equal(t, "secret", got.Password)
 	require.Equal(t, "phatodo", got.WorkspaceName)
 	require.Equal(t, "phatodo", got.ProjectName)
-	require.Equal(t, "PHATOD", got.IssuePrefix)
 	configPath := filepath.Join(workdir, ".phatodo", "config.json")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)

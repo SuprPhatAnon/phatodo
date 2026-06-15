@@ -77,7 +77,6 @@ The import should preserve:
 ### Config
 
 - Trekker config values map to `project_config`
-- `issue_prefix` should be imported explicitly
 
 ### History
 
@@ -109,4 +108,3 @@ The implementation should provide one of:
 - a server-side import endpoint
 
 The docs should treat the import path as a first-class operational feature, even before it is implemented.
-

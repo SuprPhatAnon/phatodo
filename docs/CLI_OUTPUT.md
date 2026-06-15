@@ -32,25 +32,25 @@ Rules:
 `ptodo config list`:
 
 ```text
-issue_prefix=ABC
+theme=dark
 ```
 
-`ptodo config set issue_prefix ABC`:
+`ptodo config set theme dark`:
 
 ```text
-issue_prefix=ABC
+theme=dark
 ```
 
-`ptodo config get issue_prefix`:
+`ptodo config get theme`:
 
 ```text
-issue_prefix=ABC
+theme=dark
 ```
 
-`ptodo config unset issue_prefix`:
+`ptodo config unset theme`:
 
 ```text
-issue_prefix=ABC
+theme=dark
 ```
 
 ### Tasks and epics

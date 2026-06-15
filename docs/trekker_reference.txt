@@ -27,7 +27,7 @@ trekker epic complete <epic-id>   # Complete and archive all tasks
 trekker epic delete <epic-id>
 
 ### Tasks
-trekker task create -t "Title" [-d "desc"] [-p 0-5] [-e <epic-id>] [--tags "a,b"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
+trekker task create -t "Title" --issue-prefix <prefix> [-d "desc"] [-p 0-5] [-e <epic-id>] [--tags "a,b"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 trekker task list [--status <status>] [--epic <epic-id>]
 trekker task show <task-id>
 trekker task update <task-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [--tags "a,b"] [-e <epic-id>] [--no-epic] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
@@ -57,9 +57,9 @@ trekker lock list [--type epic,task,subtask] [--entity <entity-id>] [--active]
 
 ### Project Config
 trekker config list
-trekker config get issue_prefix
-trekker config set issue_prefix ABC
-trekker config unset issue_prefix
+trekker config get <key>
+trekker config set <key> <value>
+trekker config unset <key>
 
 ### Search (full-text across all entities)
 trekker search "query" [--type epic,task,subtask,comment] [--status <status>]

@@ -50,9 +50,8 @@ Required behavior:
 - create the workspace and project needed for the current repository if they do not already exist
 - create the project-scoped access identity needed by the CLI
 - create the matching `user_project_access` row for that identity
-- seed the initial project config, including `issue_prefix`
 - write the local `.phatodo/config.json`
-- fail if project config already exists for the target project
+- fail if the target project already exists
 
 The command is the project bootstrap step and should be treated as a one-time provisioning path for a given project.
 
@@ -77,7 +76,6 @@ Required fields:
 - `id`
 - `workspace_id`
 - `name`
-- `issue_prefix`
 
 This is the project the CLI will point at in `.phatodo/config.json`.
 
@@ -104,14 +102,6 @@ Required fields for the project-scoped CLI identity created by `ptodo admin boot
 Required associated access row:
 
 - `user_project_access` linking the user to the bootstrap project
-
-### `project_config`
-
-At minimum, seed:
-
-- `issue_prefix`
-
-This is the first server-backed command path.
 
 ## Recommended Bootstrap Sequence
 
@@ -149,7 +139,6 @@ Before any user can run the base ticket system, all of the following must be tru
 - the bootstrap project exists
 - the project-scoped CLI identity exists
 - the matching `user_project_access` row exists
-- the project config exists
 - the local CLI config points at the project
 - the CLI can authenticate with the server
 

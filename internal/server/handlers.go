@@ -179,8 +179,8 @@ func (a *app) adminBootstrap(w http.ResponseWriter, r *http.Request) {
 	result, err := a.config.BootstrapManager.BootstrapProject(r.Context(), req)
 	if err != nil {
 		switch {
-		case errors.Is(err, postgres.ErrProjectConfigExists):
-			respondError(w, http.StatusConflict, "project_config_exists", err.Error())
+		case errors.Is(err, postgres.ErrProjectAlreadyExists):
+			respondError(w, http.StatusConflict, "project_already_exists", err.Error())
 		case errors.Is(err, postgres.ErrInvalidAdminCredentials):
 			respondError(w, http.StatusUnauthorized, "invalid_credentials", err.Error())
 		default:
@@ -256,9 +256,6 @@ func decodeAdminBootstrapRequest(body io.Reader) (domain.AdminBootstrapRequest, 
 	}
 	if req.ProjectName == "" {
 		return domain.AdminBootstrapRequest{}, errors.New("project_name is required")
-	}
-	if req.IssuePrefix == "" {
-		return domain.AdminBootstrapRequest{}, errors.New("issue_prefix is required")
 	}
 	return req, nil
 }

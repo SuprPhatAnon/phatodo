@@ -108,7 +108,6 @@ type AdminBootstrapRequest struct {
 	Password      string `json:"password"`
 	WorkspaceName string `json:"workspace_name"`
 	ProjectName   string `json:"project_name"`
-	IssuePrefix   string `json:"issue_prefix"`
 }
 
 type AdminBootstrapResponse struct {

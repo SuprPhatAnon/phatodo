@@ -91,7 +91,7 @@ func (f fakeProjectConfigWriter) DeleteProjectConfig(_ context.Context, _ string
 func TestProjectConfigListReturnsItems(t *testing.T) {
 	handler := newApp(Config{
 		ProjectConfigReader: fakeProjectConfigReader{
-			items: []domain.ProjectConfig{{Key: "issue_prefix", Value: "ABC"}},
+			items: []domain.ProjectConfig{{Key: "theme", Value: "dark"}},
 		},
 	}).routes()
 
@@ -114,18 +114,18 @@ func TestProjectConfigListReturnsItems(t *testing.T) {
 
 	item, ok := items[0].(map[string]any)
 	require.True(t, ok)
-	require.Equal(t, "issue_prefix", item["key"])
-	require.Equal(t, "ABC", item["value"])
+	require.Equal(t, "theme", item["key"])
+	require.Equal(t, "dark", item["value"])
 }
 
 func TestProjectConfigSetReturnsItem(t *testing.T) {
 	handler := newApp(Config{
 		ProjectConfigWriter: fakeProjectConfigWriter{
-			item: domain.ProjectConfig{Key: "issue_prefix", Value: "ABC"},
+			item: domain.ProjectConfig{Key: "theme", Value: "dark"},
 		},
 	}).routes()
 
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/projects/project-1/config/issue_prefix", strings.NewReader(`{"value":"ABC"}`))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/projects/project-1/config/theme", strings.NewReader(`{"value":"dark"}`))
 	req.Header.Set(AccessKeyHeader, "key")
 	req.Header.Set(AccessSecretHeader, "secret")
 	rec := httptest.NewRecorder()
@@ -136,18 +136,18 @@ func TestProjectConfigSetReturnsItem(t *testing.T) {
 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	require.Equal(t, "issue_prefix", body["key"])
-	require.Equal(t, "ABC", body["value"])
+	require.Equal(t, "theme", body["key"])
+	require.Equal(t, "dark", body["value"])
 }
 
 func TestProjectConfigGetReturnsItem(t *testing.T) {
 	handler := newApp(Config{
 		ProjectConfigReader: fakeProjectConfigReader{
-			item: domain.ProjectConfig{Key: "issue_prefix", Value: "ABC"},
+			item: domain.ProjectConfig{Key: "theme", Value: "dark"},
 		},
 	}).routes()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/config/issue_prefix", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/config/theme", nil)
 	req.Header.Set(AccessKeyHeader, "key")
 	req.Header.Set(AccessSecretHeader, "secret")
 	rec := httptest.NewRecorder()
@@ -158,18 +158,18 @@ func TestProjectConfigGetReturnsItem(t *testing.T) {
 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	require.Equal(t, "issue_prefix", body["key"])
-	require.Equal(t, "ABC", body["value"])
+	require.Equal(t, "theme", body["key"])
+	require.Equal(t, "dark", body["value"])
 }
 
 func TestProjectConfigUnsetReturnsItem(t *testing.T) {
 	handler := newApp(Config{
 		ProjectConfigWriter: fakeProjectConfigWriter{
-			item: domain.ProjectConfig{Key: "issue_prefix", Value: "ABC"},
+			item: domain.ProjectConfig{Key: "theme", Value: "dark"},
 		},
 	}).routes()
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/config/issue_prefix", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/config/theme", nil)
 	req.Header.Set(AccessKeyHeader, "key")
 	req.Header.Set(AccessSecretHeader, "secret")
 	rec := httptest.NewRecorder()
@@ -180,8 +180,8 @@ func TestProjectConfigUnsetReturnsItem(t *testing.T) {
 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	require.Equal(t, "issue_prefix", body["key"])
-	require.Equal(t, "ABC", body["value"])
+	require.Equal(t, "theme", body["key"])
+	require.Equal(t, "dark", body["value"])
 }
 
 type fakeBootstrapManager struct {
@@ -237,7 +237,7 @@ func TestAdminBootstrapReturnsProjectConfig(t *testing.T) {
 		},
 	}).routes()
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/bootstrap", strings.NewReader(`{"username":"alice","password":"secret","workspace_name":"phatodo","project_name":"phatodo","issue_prefix":"PHA"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/bootstrap", strings.NewReader(`{"username":"alice","password":"secret","workspace_name":"phatodo","project_name":"phatodo"}`))
 	rec := httptest.NewRecorder()
 
 	handler.ServeHTTP(rec, req)

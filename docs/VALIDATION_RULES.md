@@ -130,7 +130,6 @@ Rules:
 Rules:
 
 - config keys are unique per project
-- `issue_prefix` should be present before the project is considered ready for normal usage
 - config updates should be recorded in audit history
 
 ## Search and History Rules
@@ -156,7 +155,7 @@ Rules:
 - `ptodo admin init` must fail if any admin user already exists
 - `ptodo admin init` must create the first admin user only
 - `ptodo admin bootstrap` must authenticate against the admin user created by `ptodo admin init`
-- `ptodo admin bootstrap` must fail if project config already exists for the target project
+- `ptodo admin bootstrap` must fail if the target project already exists
 - `ptodo admin bootstrap` must create the workspace/project, project-scoped CLI identity, and matching `user_project_access` row needed for the local config
 - a server with no admin user or no bootstrap project is not ready for CLI use
 - the CLI should not guess bootstrap state

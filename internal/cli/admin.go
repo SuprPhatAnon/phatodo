@@ -80,10 +80,6 @@ func runAdminBootstrap(args []string, stdout io.Writer, stderr io.Writer) int {
 	if workspaceName == "" {
 		workspaceName = repoBaseName(workdir)
 	}
-	issuePrefix := opts.issuePrefix
-	if issuePrefix == "" {
-		issuePrefix = deriveIssuePrefix(projectName)
-	}
 
 	password, err := readPasswordPrompt("admin password: ", stderr)
 	if err != nil {
@@ -102,7 +98,6 @@ func runAdminBootstrap(args []string, stdout io.Writer, stderr io.Writer) int {
 		Password:      password,
 		WorkspaceName: workspaceName,
 		ProjectName:   projectName,
-		IssuePrefix:   issuePrefix,
 	})
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -136,7 +131,6 @@ type adminBootstrapOptions struct {
 	apiURL        string
 	workspaceName string
 	projectName   string
-	issuePrefix   string
 }
 
 func parseAdminInitArgs(args []string) (adminInitOptions, error) {
@@ -182,7 +176,6 @@ func parseAdminBootstrapArgs(args []string) (adminBootstrapOptions, error) {
 	var apiURLLong string
 	var workspaceName string
 	var projectName string
-	var issuePrefix string
 
 	fs.StringVar(&usernameShort, "u", "", "")
 	fs.StringVar(&usernameLong, "username", "", "")
@@ -190,7 +183,6 @@ func parseAdminBootstrapArgs(args []string) (adminBootstrapOptions, error) {
 	fs.StringVar(&apiURLLong, "api-url", "", "")
 	fs.StringVar(&workspaceName, "workspace-name", "", "")
 	fs.StringVar(&projectName, "project-name", "", "")
-	fs.StringVar(&issuePrefix, "issue-prefix", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return adminBootstrapOptions{}, fmt.Errorf("invalid admin bootstrap flags: %w", err)
@@ -213,7 +205,6 @@ func parseAdminBootstrapArgs(args []string) (adminBootstrapOptions, error) {
 		apiURL:        apiURL,
 		workspaceName: workspaceName,
 		projectName:   projectName,
-		issuePrefix:   issuePrefix,
 	}, nil
 }
 
@@ -242,28 +233,6 @@ func repoBaseName(workdir string) string {
 		return "phatodo"
 	}
 	return name
-}
-
-func deriveIssuePrefix(projectName string) string {
-	projectName = strings.TrimSpace(projectName)
-	if projectName == "" {
-		return "PTD"
-	}
-
-	var builder strings.Builder
-	for _, r := range strings.ToUpper(projectName) {
-		if r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
-			builder.WriteRune(r)
-		}
-		if builder.Len() >= 6 {
-			break
-		}
-	}
-	prefix := builder.String()
-	if prefix == "" {
-		return "PTD"
-	}
-	return prefix
 }
 
 func firstNonEmpty(values ...string) string {

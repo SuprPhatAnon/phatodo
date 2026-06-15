@@ -102,7 +102,7 @@ The server responds with:
 {
   "project_id": "default",
   "items": [
-    { "key": "issue_prefix", "value": "ABC" }
+    { "key": "theme", "value": "dark" }
   ]
 }
 ```
@@ -110,7 +110,7 @@ The server responds with:
 The CLI prints that as:
 
 ```text
-issue_prefix=ABC
+theme=dark
 ```
 
 For `ptodo config set`, the server responds with the stored `{key, value}` row and the CLI prints the same `key=value` line for confirmation.
@@ -131,12 +131,12 @@ The bootstrap path is split into two steps:
 2. `ptodo admin bootstrap`
    - CLI prompts for the admin password.
    - CLI sends the admin username and API server URL to `POST /api/v1/admin/bootstrap`.
-   - The server authenticates the admin, creates the bootstrap workspace/project and the project-scoped CLI identity, creates the matching `user_project_access` row, seeds `project_config`, and returns the local config payload.
+   - The server authenticates the admin, creates the bootstrap workspace/project and the project-scoped CLI identity, creates the matching `user_project_access` row, and returns the local config payload.
    - CLI writes the returned `api_url`, `workspace_id`, `project_id`, `access_key`, and `access_secret` into `<repo>/.phatodo/config.json`.
 
 These bootstrap routes are the exception to the normal access-key header flow documented above.
 
-This bootstrap flow must fail if project config already exists for the target project.
+This bootstrap flow must fail if the target project already exists.
 
 ## Planned End-State Flow
 

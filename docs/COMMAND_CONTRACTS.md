@@ -100,9 +100,8 @@ Contract:
 - create the workspace and project if they do not already exist
 - create the project-scoped CLI identity used by the local config
 - create the matching `user_project_access` row for that identity
-- seed the initial project config, including `issue_prefix`
 - write `.phatodo/config.json`
-- fail if project config already exists for the target project
+- fail if the target project already exists
 
 Local file fields:
 - `api_url`
@@ -203,6 +202,7 @@ Server request:
 
 Required input:
 - `-t <title>`
+- `--issue-prefix <prefix>`
 
 Optional input:
 - `-d <description>`
@@ -217,6 +217,7 @@ Server request:
 
 Expected body fields:
 - `title`
+- `issue_prefix`
 - `description`
 - `priority`
 - `epic_id`
