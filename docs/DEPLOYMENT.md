@@ -8,7 +8,15 @@ Build the server image from the repository root:
 make docker-build
 ```
 
-The image contains both binaries, but runs `phatodo-server` by default. Configure it with:
+The image contains both binaries and defaults to `phatodo-server`. The Makefile tags it as `$(REGISTRY)/phatodo:$(TAG)`, which defaults to `10.80.0.85:30500/phatodo:latest`. Use `TAG=...` or `REGISTRY=...` to override that if needed.
+
+Push the image to the cluster-local registry with:
+
+```sh
+make docker-push
+```
+
+Configure the server with:
 
 - `PHATODO_ADDR`, default `:8080`
 - `PHATODO_DATABASE_URL`, a Postgres connection string
@@ -35,16 +43,10 @@ The manifests in `deploy/k3s/` deploy:
 
 Run database migrations separately after Postgres is available. The current server image includes `migrations/`, but no migration runner has been implemented yet.
 
-Before applying, edit:
+The checked-in k3s bundle targets the `phatodo` namespace and the default image tag from the Makefile. If you change `REGISTRY`, `TAG`, or `KUBE_NAMESPACE`, use the same values when deploying.
 
-- `deploy/k3s/app.yaml` image name
-- `deploy/k3s/ingress.yaml` host
-- `deploy/k3s/cert-issuer.yaml` email
-- `deploy/k3s/postgres-secret.yaml` password and URL
-
-Apply with:
+Apply and wait for rollout with:
 
 ```sh
-make k3s-render
 make deploy-k3s
 ```
