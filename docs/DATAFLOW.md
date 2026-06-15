@@ -110,14 +110,14 @@ The server responds with:
 The CLI prints that as:
 
 ```text
-theme=dark
+- theme: dark
 ```
 
-For `ptodo config set`, the server responds with the stored `{key, value}` row and the CLI prints the same `key=value` line for confirmation.
+For `ptodo config set`, the server responds with the stored `{key, value}` row and the CLI prints the same `- key: value` line for confirmation.
 
-For `ptodo config get`, the server responds with the requested `{key, value}` row and the CLI prints `key=value`.
+For `ptodo config get`, the server responds with the requested `{key, value}` row and the CLI prints `- key: value`.
 
-For `ptodo config unset`, the server responds with the removed `{key, value}` row and the CLI prints `key=value` for confirmation.
+For `ptodo config unset`, the server responds with the removed `{key, value}` row and the CLI prints `- key: value` for confirmation.
 
 ## Current End-to-End Flow: `task create`
 
@@ -180,9 +180,13 @@ The server responds with:
 The CLI prints that as:
 
 ```text
-id=ABC-1
-issue_prefix=ABC
-title=Write docs
+- id: ABC-1
+  issue_prefix: ABC
+  title: "Write docs"
+  status: todo
+  priority: 2
+  project_id: default
+  workspace_id: default
 ```
 
 ## Current End-to-End Flow: `task list`
@@ -243,7 +247,13 @@ The server responds with:
 The CLI prints each item on its own line as:
 
 ```text
-id=ABC-1 title=Write docs status=in_progress priority=2 epic_id=epic-1
+tasks[1]:
+  - id: ABC-1
+    title: "Write docs"
+    description: ""
+    priority: 2
+    status: in_progress
+    epicId: epic-1
 ```
 
 ## Current End-to-End Flow: `ready`
@@ -311,7 +321,7 @@ The server responds with:
 }
 ```
 
-The CLI prints each ready item on its own line and prints each unblocked task on an indented `-> unblocks ...` line.
+The CLI prints ready work as a TOON array of objects, with nested `tags` fields and a compact `dependents` array when present.
 
 ## Bootstrap Flow
 
@@ -327,6 +337,7 @@ The bootstrap path is split into two steps:
    - CLI sends the admin username and API server URL to `POST /api/v1/admin/bootstrap`.
    - The server authenticates the admin, creates the bootstrap workspace/project and the project-scoped CLI identity, creates the matching `user_project_access` row, and returns the local config payload.
    - CLI writes the returned `api_url`, `workspace_id`, `project_id`, `access_key`, and `access_secret` into `<repo>/.phatodo/config.json`.
+   - CLI prints the returned `workspace_id`, `project_id`, `access_key`, `access_secret`, and `config_path` as TOON fields.
 
 These bootstrap routes are the exception to the normal access-key header flow documented above.
 

@@ -121,7 +121,7 @@ Rules:
 
 - `ptodo ready` should show only top-level tasks in `todo` status
 - a ready task must have all dependencies satisfied
-- `--epic` should scope both the ready list and any unblocks hints to that epic
+- `--epic` should scope both the ready list and any dependents hints to that epic
 - the ready view should stay ordered by priority first so agents can pick the most urgent unblocked work quickly
 
 ## Lock Rules

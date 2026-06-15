@@ -9,7 +9,7 @@ Phatodo has two deliverables:
 
 - `cmd/ptodo` is the CLI entrypoint. It should preserve the command structure documented in `docs/trekker_reference.txt`.
 - `cmd/phatodo-server` is the API and dashboard server entrypoint.
-- `internal/cli` owns command parsing, output modes such as `--toon`, and API client wiring.
+- `internal/cli` owns command parsing, output modes such as `--toon`, TOON serialization, and API client wiring.
 - `internal/server` owns HTTP routing for JSON APIs and dashboard delivery.
 - `internal/domain` contains shared entity names, statuses, priorities, and validation rules.
 - `internal/storage/postgres` will contain Postgres repositories.

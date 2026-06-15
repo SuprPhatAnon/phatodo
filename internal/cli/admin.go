@@ -38,7 +38,7 @@ func runAdminInit(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(config.LocalConfig{APIURL: opts.apiURL})
+	client, err := newAPIClient(config.LocalConfig{APIURL: opts.apiURL})
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -53,9 +53,10 @@ func runAdminInit(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "created admin user %s\n", resp.Username)
-	fmt.Fprintf(stdout, "access_key=%s\n", resp.AccessKey)
-	fmt.Fprintf(stdout, "access_secret=%s\n", resp.AccessSecret)
+	writeTOONListItemStart(stdout, 0, "user_id", resp.UserID)
+	writeTOONField(stdout, 1, "username", resp.Username)
+	writeTOONField(stdout, 1, "access_key", resp.AccessKey)
+	writeTOONField(stdout, 1, "access_secret", resp.AccessSecret)
 	return 0
 }
 
@@ -87,7 +88,7 @@ func runAdminBootstrap(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(config.LocalConfig{APIURL: opts.apiURL})
+	client, err := newAPIClient(config.LocalConfig{APIURL: opts.apiURL})
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -116,8 +117,11 @@ func runAdminBootstrap(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "bootstrapped project %s\n", resp.ProjectID)
-	fmt.Fprintf(stdout, "wrote local config to %s\n", path)
+	writeTOONListItemStart(stdout, 0, "workspace_id", resp.WorkspaceID)
+	writeTOONField(stdout, 1, "project_id", resp.ProjectID)
+	writeTOONField(stdout, 1, "access_key", resp.AccessKey)
+	writeTOONField(stdout, 1, "access_secret", resp.AccessSecret)
+	writeTOONField(stdout, 1, "config_path", path)
 	return 0
 }
 

@@ -103,8 +103,12 @@ func runInit(stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "initialized local ptodo config at %s\n", path)
-	fmt.Fprintln(stdout, "edit api_url, workspace_id, project_id, access_key, and access_secret before using server-backed commands")
+	writeTOONListItemStart(stdout, 0, "config_path", path)
+	writeTOONField(stdout, 1, "api_url", config.DefaultLocalConfig().APIURL)
+	writeTOONField(stdout, 1, "workspace_id", config.DefaultLocalConfig().WorkspaceID)
+	writeTOONField(stdout, 1, "project_id", config.DefaultLocalConfig().ProjectID)
+	writeTOONField(stdout, 1, "access_key", config.DefaultLocalConfig().AccessKey)
+	writeTOONField(stdout, 1, "access_secret", config.DefaultLocalConfig().AccessSecret)
 	return 0
 }
 
@@ -121,7 +125,7 @@ func runConfigList(stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -134,12 +138,11 @@ func runConfigList(stdout io.Writer, stderr io.Writer) int {
 	}
 
 	if len(items) == 0 {
-		fmt.Fprintln(stdout, "no project config entries")
 		return 0
 	}
 
 	for _, item := range items {
-		fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+		writeProjectConfigItem(stdout, item)
 	}
 	return 0
 }
@@ -162,7 +165,7 @@ func runConfigSet(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -174,7 +177,7 @@ func runConfigSet(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+	writeProjectConfigItem(stdout, item)
 	return 0
 }
 
@@ -196,7 +199,7 @@ func runConfigGet(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -208,7 +211,7 @@ func runConfigGet(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+	writeProjectConfigItem(stdout, item)
 	return 0
 }
 
@@ -230,7 +233,7 @@ func runConfigUnset(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -242,7 +245,7 @@ func runConfigUnset(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
+	writeProjectConfigItem(stdout, item)
 	return 0
 }
 
@@ -265,7 +268,7 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -289,9 +292,7 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "id=%s\n", resp.ID)
-	fmt.Fprintf(stdout, "issue_prefix=%s\n", resp.IssuePrefix)
-	fmt.Fprintf(stdout, "title=%s\n", resp.Title)
+	writeTaskCreateResponse(stdout, resp)
 	return 0
 }
 
@@ -314,7 +315,7 @@ func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -326,18 +327,9 @@ func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
+	writeTOONArrayHeader(stdout, 0, "tasks", len(resp.Items))
 	for _, item := range resp.Items {
-		fmt.Fprintf(stdout, "id=%s title=%s status=%s priority=%d", item.ID, item.Title, item.Status, item.Priority)
-		if item.EpicID != "" {
-			fmt.Fprintf(stdout, " epic_id=%s", item.EpicID)
-		}
-		if item.ParentTaskID != "" {
-			fmt.Fprintf(stdout, " parent_task_id=%s", item.ParentTaskID)
-		}
-		if len(item.Tags) > 0 {
-			fmt.Fprintf(stdout, " tags=%s", strings.Join(item.Tags, ","))
-		}
-		fmt.Fprintln(stdout)
+		writeTaskListItem(stdout, 1, item)
 	}
 	return 0
 }
@@ -361,7 +353,7 @@ func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	client, err := NewAPIClient(cfg)
+	client, err := newAPIClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
 		return 1
@@ -373,25 +365,9 @@ func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
+	writeTOONArrayHeader(stdout, 0, "ready", len(resp.Items))
 	for _, item := range resp.Items {
-		fmt.Fprintf(stdout, "%s | P%d | %s", item.ID, item.Priority, item.Title)
-		if item.EpicID != "" {
-			fmt.Fprintf(stdout, " (%s)", item.EpicID)
-		}
-		if len(item.Tags) > 0 {
-			fmt.Fprintf(stdout, " [%s]", strings.Join(item.Tags, ","))
-		}
-		fmt.Fprintln(stdout)
-		for _, blocked := range item.Unblocks {
-			fmt.Fprintf(stdout, "  -> unblocks %s | %s | P%d | %s", blocked.ID, blocked.Status, blocked.Priority, blocked.Title)
-			if blocked.EpicID != "" {
-				fmt.Fprintf(stdout, " (%s)", blocked.EpicID)
-			}
-			if len(blocked.Tags) > 0 {
-				fmt.Fprintf(stdout, " [%s]", strings.Join(blocked.Tags, ","))
-			}
-			fmt.Fprintln(stdout)
-		}
+		writeReadyListItem(stdout, 1, item)
 	}
 	return 0
 }

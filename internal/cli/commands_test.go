@@ -2,10 +2,8 @@ package cli
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +13,54 @@ import (
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
 	"github.com/stretchr/testify/require"
 )
+
+type fakeAPIClient struct {
+	listProjectConfigFn  func(context.Context, string) ([]ProjectConfigItem, error)
+	getProjectConfigFn   func(context.Context, string, string) (ProjectConfigItem, error)
+	setProjectConfigFn   func(context.Context, string, string, string) (ProjectConfigItem, error)
+	unsetProjectConfigFn func(context.Context, string, string) (ProjectConfigItem, error)
+	createTaskFn         func(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	listTasksFn          func(context.Context, string, string, string) (domain.TaskListResponse, error)
+	listReadyTasksFn     func(context.Context, string, string) (domain.ReadyListResponse, error)
+	initAdminFn          func(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
+	bootstrapAdminFn     func(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
+}
+
+func (f *fakeAPIClient) ListProjectConfig(ctx context.Context, projectID string) ([]ProjectConfigItem, error) {
+	return f.listProjectConfigFn(ctx, projectID)
+}
+
+func (f *fakeAPIClient) GetProjectConfig(ctx context.Context, projectID, key string) (ProjectConfigItem, error) {
+	return f.getProjectConfigFn(ctx, projectID, key)
+}
+
+func (f *fakeAPIClient) SetProjectConfig(ctx context.Context, projectID, key, value string) (ProjectConfigItem, error) {
+	return f.setProjectConfigFn(ctx, projectID, key, value)
+}
+
+func (f *fakeAPIClient) UnsetProjectConfig(ctx context.Context, projectID, key string) (ProjectConfigItem, error) {
+	return f.unsetProjectConfigFn(ctx, projectID, key)
+}
+
+func (f *fakeAPIClient) CreateTask(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+	return f.createTaskFn(ctx, projectID, req)
+}
+
+func (f *fakeAPIClient) ListTasks(ctx context.Context, projectID, status, epicID string) (domain.TaskListResponse, error) {
+	return f.listTasksFn(ctx, projectID, status, epicID)
+}
+
+func (f *fakeAPIClient) ListReadyTasks(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
+	return f.listReadyTasksFn(ctx, projectID, epicID)
+}
+
+func (f *fakeAPIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
+	return f.initAdminFn(ctx, req)
+}
+
+func (f *fakeAPIClient) BootstrapAdmin(ctx context.Context, req domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error) {
+	return f.bootstrapAdminFn(ctx, req)
+}
 
 func TestRunTaskListCallsServer(t *testing.T) {
 	var stdout bytes.Buffer
@@ -28,31 +74,33 @@ func TestRunTaskListCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/projects/default/tasks", r.URL.Path)
-		require.Equal(t, "in_progress", r.URL.Query().Get("status"))
-		require.Equal(t, "epic-1", r.URL.Query().Get("epic"))
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"project_id": "default",
-			"items": []map[string]any{
-				{
-					"id":       "ABC-1",
-					"title":    "Write docs",
-					"status":   "in_progress",
-					"priority": 2,
-					"epic_id":  "epic-1",
-				},
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listTasksFn: func(ctx context.Context, projectID, status, epicID string) (domain.TaskListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "in_progress", status)
+				require.Equal(t, "epic-1", epicID)
+				return domain.TaskListResponse{
+					ProjectID: "default",
+					Items: []domain.TaskListItem{
+						{
+							ID:       "ABC-1",
+							Title:    "Write docs",
+							Status:   domain.StatusInProgress,
+							Priority: domain.PriorityMedium,
+							EpicID:   "epic-1",
+						},
+					},
+				}, nil
 			},
-		})
-	}))
-	t.Cleanup(server.Close)
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -63,9 +111,10 @@ func TestRunTaskListCallsServer(t *testing.T) {
 
 	code := Run([]string{"task", "list", "--status", "in_progress", "--epic", "epic-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "id=ABC-1")
-	require.Contains(t, stdout.String(), "status=in_progress")
-	require.Contains(t, stdout.String(), "epic_id=epic-1")
+	require.Contains(t, stdout.String(), "tasks[1]:")
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "status: in_progress")
+	require.Contains(t, stdout.String(), "epicId: epic-1")
 }
 
 func TestRunReadyCallsServer(t *testing.T) {
@@ -80,41 +129,43 @@ func TestRunReadyCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/projects/default/ready", r.URL.Path)
-		require.Equal(t, "epic-1", r.URL.Query().Get("epic"))
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"project_id": "default",
-			"items": []map[string]any{
-				{
-					"id":       "CORE-1",
-					"title":    "Health endpoints",
-					"status":   "todo",
-					"priority": 1,
-					"epic_id":  "epic-1",
-					"tags":     []string{"infra", "api"},
-					"unblocks": []map[string]any{
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listReadyTasksFn: func(ctx context.Context, projectID, epicID string) (domain.ReadyListResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "epic-1", epicID)
+				return domain.ReadyListResponse{
+					ProjectID: "default",
+					Items: []domain.ReadyListItem{
 						{
-							"id":       "CORE-5",
-							"title":    "Backups",
-							"status":   "todo",
-							"priority": 1,
-							"epic_id":  "epic-1",
-							"tags":     []string{"infra"},
+							ID:       "CORE-1",
+							Title:    "Health endpoints",
+							Status:   domain.StatusTodo,
+							Priority: domain.PriorityHigh,
+							EpicID:   "epic-1",
+							Tags:     []string{"infra", "api"},
+							Unblocks: []domain.TaskListItem{
+								{
+									ID:       "CORE-5",
+									Title:    "Backups",
+									Status:   domain.StatusTodo,
+									Priority: domain.PriorityHigh,
+									EpicID:   "epic-1",
+									Tags:     []string{"infra"},
+								},
+							},
 						},
 					},
-				},
+				}, nil
 			},
-		})
-	}))
-	t.Cleanup(server.Close)
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -125,8 +176,10 @@ func TestRunReadyCallsServer(t *testing.T) {
 
 	code := Run([]string{"ready", "--epic", "epic-1"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "CORE-1 | P1 | Health endpoints")
-	require.Contains(t, stdout.String(), "-> unblocks CORE-5 | todo | P1 | Backups")
+	require.Contains(t, stdout.String(), "ready[1]:")
+	require.Contains(t, stdout.String(), "- id: CORE-1")
+	require.Contains(t, stdout.String(), "dependents[1]{id,title,status,priority}:")
+	require.Contains(t, stdout.String(), "CORE-5,Backups,todo,1")
 }
 
 func TestRunInitWritesLocalConfig(t *testing.T) {
@@ -150,6 +203,8 @@ func TestRunInitWritesLocalConfig(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d: %s", code, stderr.String())
 	}
+	require.Contains(t, stdout.String(), "- config_path:")
+	require.Contains(t, stdout.String(), "project_id: default")
 
 	configPath := filepath.Join(workdir, ".phatodo", "config.json")
 	data, err := os.ReadFile(configPath)
@@ -186,23 +241,20 @@ func TestRunConfigListFetchesProjectConfig(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config", r.URL.Path)
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"project_id": "default",
-			"items": []map[string]string{
-				{"key": "theme", "value": "dark"},
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		require.Equal(t, "default", cfg.ProjectID)
+		return &fakeAPIClient{
+			listProjectConfigFn: func(ctx context.Context, projectID string) ([]ProjectConfigItem, error) {
+				require.Equal(t, "default", projectID)
+				return []ProjectConfigItem{{Key: "theme", Value: "dark"}}, nil
 			},
-		})
-	}))
-	t.Cleanup(server.Close)
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -213,7 +265,7 @@ func TestRunConfigListFetchesProjectConfig(t *testing.T) {
 
 	code := Run([]string{"config", "list"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "theme=dark")
+	require.Contains(t, stdout.String(), "- theme: dark")
 }
 
 func TestRunConfigSetCallsServer(t *testing.T) {
@@ -228,25 +280,21 @@ func TestRunConfigSetCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPut, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		var body map[string]string
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		require.Equal(t, "dark", body["value"])
-
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "theme",
-			"value": "dark",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			setProjectConfigFn: func(ctx context.Context, projectID, key, value string) (ProjectConfigItem, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "theme", key)
+				require.Equal(t, "dark", value)
+				return ProjectConfigItem{Key: "theme", Value: "dark"}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -257,7 +305,7 @@ func TestRunConfigSetCallsServer(t *testing.T) {
 
 	code := Run([]string{"config", "set", "theme", "dark"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "theme=dark")
+	require.Contains(t, stdout.String(), "- theme: dark")
 }
 
 func TestRunConfigGetCallsServer(t *testing.T) {
@@ -272,21 +320,20 @@ func TestRunConfigGetCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodGet, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "theme",
-			"value": "dark",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			getProjectConfigFn: func(ctx context.Context, projectID, key string) (ProjectConfigItem, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "theme", key)
+				return ProjectConfigItem{Key: "theme", Value: "dark"}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -297,7 +344,7 @@ func TestRunConfigGetCallsServer(t *testing.T) {
 
 	code := Run([]string{"config", "get", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "theme=dark")
+	require.Contains(t, stdout.String(), "- theme: dark")
 }
 
 func TestRunConfigUnsetCallsServer(t *testing.T) {
@@ -312,21 +359,20 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodDelete, r.Method)
-		require.Equal(t, "/api/v1/projects/default/config/theme", r.URL.Path)
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"key":   "theme",
-			"value": "dark",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			unsetProjectConfigFn: func(ctx context.Context, projectID, key string) (ProjectConfigItem, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "theme", key)
+				return ProjectConfigItem{Key: "theme", Value: "dark"}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -337,7 +383,7 @@ func TestRunConfigUnsetCallsServer(t *testing.T) {
 
 	code := Run([]string{"config", "unset", "theme"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "theme=dark")
+	require.Contains(t, stdout.String(), "- theme: dark")
 }
 
 func TestRunTaskCreateCallsServer(t *testing.T) {
@@ -352,32 +398,30 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 	})
 	require.NoError(t, os.Chdir(workdir))
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/projects/default/tasks", r.URL.Path)
-		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
-		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
-
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-		require.Equal(t, "Write docs", body["title"])
-		require.Equal(t, "ABC", body["issue_prefix"])
-		require.Equal(t, "dark", body["tags"].([]any)[0])
-
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id":           "ABC-1",
-			"issue_prefix": "ABC",
-			"title":        "Write docs",
-			"status":       "todo",
-			"priority":     2,
-			"project_id":   "default",
-			"workspace_id": "default",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createTaskFn: func(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "Write docs", req.Title)
+				require.Equal(t, "ABC", req.IssuePrefix)
+				require.Equal(t, []string{"dark"}, req.Tags)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-1",
+					IssuePrefix: "ABC",
+					Title:       "Write docs",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
 	cfg := config.LocalConfig{
-		APIURL:       server.URL,
+		APIURL:       "http://example.invalid",
 		WorkspaceID:  "default",
 		ProjectID:    "default",
 		AccessKey:    "key",
@@ -388,8 +432,9 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 
 	code := Run([]string{"task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--tags", "dark"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
-	require.Contains(t, stdout.String(), "id=ABC-1")
-	require.Contains(t, stdout.String(), "issue_prefix=ABC")
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "issue_prefix: ABC")
+	require.Contains(t, stdout.String(), "title: \"Write docs\"")
 }
 
 func TestRunAdminInitCallsServer(t *testing.T) {
@@ -403,24 +448,27 @@ func TestRunAdminInitCallsServer(t *testing.T) {
 	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
 
 	var got domain.AdminInitRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/admin/init", r.URL.Path)
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"user_id":       "usr_1",
-			"username":      got.Username,
-			"access_key":    "key_1",
-			"access_secret": "sec_1",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			initAdminFn: func(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
+				got = req
+				return domain.AdminInitResponse{
+					UserID:       "usr_1",
+					Username:     req.Username,
+					AccessKey:    "key_1",
+					AccessSecret: "sec_1",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
-	code := Run([]string{"admin", "init", "-u", "alice", "--url", server.URL}, &stdout, &stderr)
+	code := Run([]string{"admin", "init", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Equal(t, "alice", got.Username)
 	require.Equal(t, "secret", got.Password)
-	require.Contains(t, stdout.String(), "access_key=key_1")
+	require.Contains(t, stdout.String(), "- user_id: usr_1")
 }
 
 func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
@@ -442,20 +490,23 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
 
 	var got domain.AdminBootstrapRequest
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, http.MethodPost, r.Method)
-		require.Equal(t, "/api/v1/admin/bootstrap", r.URL.Path)
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&got))
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"workspace_id":  "ws_1",
-			"project_id":    "prj_1",
-			"access_key":    "key_1",
-			"access_secret": "sec_1",
-		})
-	}))
-	t.Cleanup(server.Close)
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			bootstrapAdminFn: func(ctx context.Context, req domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error) {
+				got = req
+				return domain.AdminBootstrapResponse{
+					WorkspaceID:  "ws_1",
+					ProjectID:    "prj_1",
+					AccessKey:    "key_1",
+					AccessSecret: "sec_1",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
 
-	code := Run([]string{"admin", "bootstrap", "-u", "alice", "--url", server.URL}, &stdout, &stderr)
+	code := Run([]string{"admin", "bootstrap", "-u", "alice", "--url", "http://example.invalid"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Equal(t, "alice", got.Username)
 	require.Equal(t, "secret", got.Password)
@@ -465,4 +516,7 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	require.Contains(t, string(data), `"project_id": "prj_1"`)
+	require.Contains(t, stdout.String(), "- workspace_id: ws_1")
+	require.Contains(t, stdout.String(), "project_id: prj_1")
+	require.Contains(t, stdout.String(), "config_path:")
 }

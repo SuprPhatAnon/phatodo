@@ -16,10 +16,10 @@ The `ptodo` executable should keep the command shape preserved in `docs/trekker_
 
 ## Behavior
 
-Support `--toon` for compact agent output. Preserve status values, priority values, and task workflow rules from the Trekker reference. Prefer additive enhancements over breaking command changes.
+Support `--toon` as compact agent output using the TOON reference in `docs/TOON_SPEC.md`. Preserve status values, priority values, and task workflow rules from the Trekker reference. Prefer additive enhancements over breaking command changes.
 
 `config list` is the first server-backed command and should print the project configuration returned from `/api/v1/projects/{projectID}/config`.
-`ready` should print top-level todo tasks that are currently unblocked, ordered by priority, with optional `--epic` scoping and inline `unblocks` hints for tasks that become available next.
+`ready` should print top-level todo tasks that are currently unblocked, ordered by priority, with optional `--epic` scoping and inline `dependents` hints for tasks that become available next.
 
 ## Schema-Driven Extensions
 

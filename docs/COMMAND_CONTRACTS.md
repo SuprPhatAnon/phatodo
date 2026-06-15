@@ -8,7 +8,7 @@ The same contract applies to `ptodo`.
 
 - All API calls are project-scoped unless explicitly noted.
 - All authenticated requests send `X-Phatodo-Access-Key` and `X-Phatodo-Access-Secret`, except the bootstrap routes described below.
-- `--toon` is the compact machine-friendly output mode.
+- `--toon` is the compact machine-friendly TOON output mode.
 - Subtasks are stored in the `tasks` table, so subtask routes point at task IDs.
 
 ## Shared Field Model
@@ -422,11 +422,11 @@ Contract:
 - return top-level tasks only
 - return only tasks in `todo` status
 - sort by priority, then creation order, then ID
-- include an `unblocks` list for any top-level `todo` tasks that would become ready if the item completed
-- if `--epic` is provided, scope both the ready list and the unblocks hints to that epic
+- include a `dependents` list for any top-level `todo` tasks that would become ready if the item completed
+- if `--epic` is provided, scope both the ready list and the dependents hints to that epic
 
 Response:
-- a project-scoped ready list with task rows and nested `unblocks` hints
+- a project-scoped ready list with task rows and nested `dependents` hints
 
 ## Config
 
@@ -559,5 +559,5 @@ Server request:
 
 - list commands return multiple records
 - show/get commands return a single record
-- `--toon` should stay compact and parseable
+- `--toon` should serialize responses as TOON objects or arrays with stable field order
 - write commands should return the created or updated resource plus any server-generated metadata

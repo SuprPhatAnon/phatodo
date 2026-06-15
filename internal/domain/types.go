@@ -81,13 +81,16 @@ type TaskCreateResponse struct {
 }
 
 type TaskListItem struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Status       Status   `json:"status"`
-	Priority     Priority `json:"priority"`
-	EpicID       string   `json:"epic_id,omitempty"`
-	ParentTaskID string   `json:"parent_task_id,omitempty"`
-	Tags         []string `json:"tags,omitempty"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description,omitempty"`
+	Status       Status    `json:"status"`
+	Priority     Priority  `json:"priority"`
+	EpicID       string    `json:"epic_id,omitempty"`
+	ParentTaskID string    `json:"parent_task_id,omitempty"`
+	Tags         []string  `json:"tags,omitempty"`
+	CreatedAt    time.Time `json:"created_at,omitempty"`
+	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 }
 
 type TaskListResponse struct {
@@ -98,12 +101,15 @@ type TaskListResponse struct {
 type ReadyListItem struct {
 	ID           string         `json:"id"`
 	Title        string         `json:"title"`
+	Description  string         `json:"description,omitempty"`
 	Status       Status         `json:"status"`
 	Priority     Priority       `json:"priority"`
 	EpicID       string         `json:"epic_id,omitempty"`
 	ParentTaskID string         `json:"parent_task_id,omitempty"`
 	Tags         []string       `json:"tags,omitempty"`
 	Unblocks     []TaskListItem `json:"unblocks,omitempty"`
+	CreatedAt    time.Time      `json:"created_at,omitempty"`
+	UpdatedAt    time.Time      `json:"updated_at,omitempty"`
 }
 
 type ReadyListResponse struct {

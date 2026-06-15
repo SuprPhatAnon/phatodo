@@ -10,12 +10,14 @@ Default mode should be human-readable and suitable for direct terminal use.
 
 ### `--toon`
 
-`--toon` is the compact, machine-friendly mode.
+`--toon` is the compact, machine-friendly TOON mode.
+Use [TOON Reference](TOON_SPEC.md) as the source of truth for syntax.
 
 Rules:
 
 - keep fields stable
 - avoid decorative text
+- prefer TOON objects or arrays over ad hoc prose
 - avoid multiline prose unless it is content from the record itself
 
 ## Output Principles
@@ -32,25 +34,25 @@ Rules:
 `ptodo config list`:
 
 ```text
-theme=dark
+- theme: dark
 ```
 
 `ptodo config set theme dark`:
 
 ```text
-theme=dark
+- theme: dark
 ```
 
 `ptodo config get theme`:
 
 ```text
-theme=dark
+- theme: dark
 ```
 
 `ptodo config unset theme`:
 
 ```text
-theme=dark
+- theme: dark
 ```
 
 ### Tasks and epics
@@ -67,22 +69,38 @@ Render:
 `ptodo task create -t "Write docs" --issue-prefix ABC`:
 
 ```text
-id=ABC-1
-issue_prefix=ABC
-title=Write docs
+- id: ABC-1
+  issue_prefix: ABC
+  title: "Write docs"
 ```
 
 `ptodo task list --status in_progress --epic epic-1`:
 
 ```text
-id=ABC-1 title=Write docs status=in_progress priority=2 epic_id=epic-1
+tasks[1]:
+  - id: ABC-1
+    title: "Write docs"
+    description: ""
+    priority: 2
+    status: in_progress
+    epicId: epic-1
 ```
 
 `ptodo ready --epic epic-1`:
 
 ```text
-CORE-1 | P1 | Health endpoints and k8s liveness/readiness probes for worker services (EPIC-1) [infra,api]
-  -> unblocks CORE-5 | todo | P1 | Two-tier automated database backups via SCP to NAS and GCS (EPIC-1) [infra]
+ready[1]:
+  - id: CORE-1
+    title: "Health endpoints and k8s liveness/readiness probes for worker services"
+    description: "Future work:..."
+    priority: 1
+    status: todo
+    epicId: epic-1
+    tags: "infra,api"
+    createdAt: "2026-06-09T02:13:02Z"
+    updatedAt: "2026-06-13T15:01:51Z"
+    dependents[1]{id,title,status,priority}:
+      - CORE-5,"Two-tier automated database backups via SCP to NAS and GCS",todo,1
 ```
 
 ### Comments
@@ -122,3 +140,4 @@ For implementation simplicity, `--toon` should prefer the same fields every time
 - then ownership and timestamps
 
 The goal is to keep the output easy for agents to parse and compare across runs.
+When a response is a list of homogeneous objects, use a TOON array with an explicit item count and field list.

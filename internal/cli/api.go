@@ -22,6 +22,18 @@ type APIClient struct {
 	httpClient   *http.Client
 }
 
+type apiClient interface {
+	ListProjectConfig(context.Context, string) ([]ProjectConfigItem, error)
+	GetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
+	SetProjectConfig(context.Context, string, string, string) (ProjectConfigItem, error)
+	UnsetProjectConfig(context.Context, string, string) (ProjectConfigItem, error)
+	CreateTask(context.Context, string, domain.TaskCreateRequest) (domain.TaskCreateResponse, error)
+	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
+	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
+	InitAdmin(context.Context, domain.AdminInitRequest) (domain.AdminInitResponse, error)
+	BootstrapAdmin(context.Context, domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error)
+}
+
 type ProjectConfigItem struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
@@ -58,6 +70,10 @@ func NewAPIClient(cfg config.LocalConfig) (*APIClient, error) {
 		accessSecret: cfg.AccessSecret,
 		httpClient:   &http.Client{},
 	}, nil
+}
+
+var newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+	return NewAPIClient(cfg)
 }
 
 func (c *APIClient) ListProjectConfig(ctx context.Context, projectID string) ([]ProjectConfigItem, error) {

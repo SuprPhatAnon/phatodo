@@ -20,7 +20,7 @@ Local `.phatodo/` data should stay limited to client config and optional cache d
 - Read `.phatodo/config.json`.
 - Send authenticated requests to the server.
 - Render JSON-backed responses as compact terminal output.
-- Preserve `--toon` as the agent-friendly output mode.
+- Preserve `--toon` as the agent-friendly TOON output mode.
 
 ### API
 
