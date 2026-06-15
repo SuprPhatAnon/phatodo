@@ -185,6 +185,134 @@ issue_prefix=ABC
 title=Write docs
 ```
 
+## Current End-to-End Flow: `task list`
+
+### 1. Command entry
+
+- `cmd/ptodo/main.go` calls `cli.Run`.
+- `internal/cli/commands.go` recognizes `task list`.
+
+### 2. Local config load
+
+- `internal/cli/commands.go` reads `<repo>/.phatodo/config.json` via `internal/config.ReadLocal`.
+- The CLI uses `api_url`, `project_id`, `access_key`, and `access_secret` from that file.
+
+### 3. HTTP request build
+
+- `internal/cli/api.go` creates the request.
+- Method: `GET`
+- URL: `{{api_url}}/api/v1/projects/{projectID}/tasks`
+- Query params:
+  - `status` if a status filter is provided
+  - `epic` if an epic filter is provided
+- Headers:
+  - `X-Phatodo-Access-Key: <access_key>`
+  - `X-Phatodo-Access-Secret: <access_secret>`
+
+### 4. Server route handling
+
+- `cmd/phatodo-server/main.go` constructs `server.Config`.
+- If `PHATODO_DATABASE_URL` is set, it creates the Postgres store and wires it as the task lister.
+- `internal/server/app.go` routes `GET /api/v1/projects/{projectID}/tasks` to `listTasks`.
+- `internal/server/auth.go` requires the access key and access secret headers before the handler runs.
+
+### 5. Repository query
+
+- `internal/server/handlers.go` calls `TaskLister.ListTasks`.
+- `internal/storage/postgres/tasks.go` validates the project, queries the `tasks` table for top-level rows, applies optional status and epic filters, and orders by priority, creation time, and ID.
+
+### 6. Response shape
+
+The server responds with:
+
+```json
+{
+  "project_id": "default",
+  "items": [
+    {
+      "id": "ABC-1",
+      "title": "Write docs",
+      "status": "in_progress",
+      "priority": 2,
+      "epic_id": "epic-1"
+    }
+  ]
+}
+```
+
+The CLI prints each item on its own line as:
+
+```text
+id=ABC-1 title=Write docs status=in_progress priority=2 epic_id=epic-1
+```
+
+## Current End-to-End Flow: `ready`
+
+### 1. Command entry
+
+- `cmd/ptodo/main.go` calls `cli.Run`.
+- `internal/cli/commands.go` recognizes `ready`.
+
+### 2. Local config load
+
+- `internal/cli/commands.go` reads `<repo>/.phatodo/config.json` via `internal/config.ReadLocal`.
+- The CLI uses `api_url`, `project_id`, `access_key`, and `access_secret` from that file.
+
+### 3. HTTP request build
+
+- `internal/cli/api.go` creates the request.
+- Method: `GET`
+- URL: `{{api_url}}/api/v1/projects/{projectID}/ready`
+- Query params:
+  - `epic` if an epic filter is provided
+- Headers:
+  - `X-Phatodo-Access-Key: <access_key>`
+  - `X-Phatodo-Access-Secret: <access_secret>`
+
+### 4. Server route handling
+
+- `cmd/phatodo-server/main.go` constructs `server.Config`.
+- If `PHATODO_DATABASE_URL` is set, it creates the Postgres store and wires it as the ready lister.
+- `internal/server/app.go` routes `GET /api/v1/projects/{projectID}/ready` to `listReadyTasks`.
+- `internal/server/auth.go` requires the access key and access secret headers before the handler runs.
+
+### 5. Repository query
+
+- `internal/server/handlers.go` calls `ReadyLister.ListReadyTasks`.
+- `internal/storage/postgres/tasks.go` finds top-level `todo` tasks with satisfied dependencies, then finds top-level `todo` tasks that would become ready if each row completed.
+
+### 6. Response shape
+
+The server responds with:
+
+```json
+{
+  "project_id": "default",
+  "items": [
+    {
+      "id": "CORE-1",
+      "title": "Health endpoints and k8s liveness/readiness probes for worker services",
+      "status": "todo",
+      "priority": 1,
+      "epic_id": "epic-1",
+      "tags": ["infra", "api"],
+      "unblocks": [
+        {
+          "id": "CORE-5",
+          "title": "Two-tier automated database backups via SCP to NAS and GCS",
+          "status": "todo",
+          "priority": 1,
+          "epic_id": "epic-1",
+          "tags": ["infra"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+The CLI prints each ready item on its own line and prints each unblocked task on an indented `-> unblocks ...` line.
+
 ## Bootstrap Flow
 
 The bootstrap path is split into two steps:
@@ -230,7 +358,7 @@ The current flow uses these tables directly:
 The next layers will add:
 
 - `epics`
-- `tasks`
+- remaining task lifecycle operations beyond create/list
 - `comments`
 - `dependencies`
 - `events`
@@ -242,7 +370,7 @@ The next layers will add:
 These pieces are still planned, not implemented:
 
 - `config get`, `config set`, and `config unset`
-- `epic`, `task`, `subtask`, `comment`, `dep`, `search`, `history`, and `list` command backends
+- `epic`, `subtask`, `comment`, `dep`, `search`, `history`, and `list` command backends
 - project creation and access-management flows
 - write-path audit history
 - lock management

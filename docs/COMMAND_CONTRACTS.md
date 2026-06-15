@@ -231,11 +231,21 @@ Response:
 ### `ptodo task list`
 
 Optional filters:
-- `--status`
-- `--epic`
+- `--status <status>`
+- `--epic <epic-id>`
 
 Server request:
 - `GET /api/v1/projects/{projectID}/tasks`
+
+Contract:
+- return top-level tasks for the project by default
+- apply `--status` as an exact status filter when provided
+- apply `--epic` as an exact epic filter when provided
+- do not include subtasks unless a subtask-specific command is used
+
+Response:
+- a project-scoped task list with the current task records
+- each item includes the task ID, title, status, priority, and any epic or parent task relationship that is present
 
 ### `ptodo task show`
 
@@ -397,6 +407,26 @@ Required input:
 
 Server request:
 - `GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies`
+
+## Workflow
+
+### `ptodo ready`
+
+Optional input:
+- `--epic <epic-id>`
+
+Server request:
+- `GET /api/v1/projects/{projectID}/ready`
+
+Contract:
+- return top-level tasks only
+- return only tasks in `todo` status
+- sort by priority, then creation order, then ID
+- include an `unblocks` list for any top-level `todo` tasks that would become ready if the item completed
+- if `--epic` is provided, scope both the ready list and the unblocks hints to that epic
+
+Response:
+- a project-scoped ready list with task rows and nested `unblocks` hints
 
 ## Config
 

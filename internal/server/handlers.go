@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
 	"github.com/SuprPhatAnon/phatodo/internal/storage/postgres"
@@ -173,6 +174,57 @@ func (a *app) createTask(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, result)
 }
 
+func (a *app) listTasks(w http.ResponseWriter, r *http.Request) {
+	if a.config.TaskLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "task_store_unavailable", "task store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	epicID := strings.TrimSpace(r.URL.Query().Get("epic"))
+	if status != "" && !isAllowedTaskStatus(status) {
+		respondError(w, http.StatusBadRequest, "invalid_status", "status must be todo, in_progress, completed, wont_fix, or archived")
+		return
+	}
+
+	result, err := a.config.TaskLister.ListTasks(r.Context(), projectID, status, epicID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "task_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
+func (a *app) listReadyTasks(w http.ResponseWriter, r *http.Request) {
+	if a.config.ReadyLister == nil {
+		respondError(w, http.StatusServiceUnavailable, "ready_store_unavailable", "ready store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	epicID := strings.TrimSpace(r.URL.Query().Get("epic"))
+
+	result, err := a.config.ReadyLister.ListReadyTasks(r.Context(), projectID, epicID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrProjectNotFound):
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+		default:
+			respondError(w, http.StatusInternalServerError, "ready_list_failed", err.Error())
+		}
+		return
+	}
+
+	respondJSON(w, http.StatusOK, result)
+}
+
 func (a *app) adminInit(w http.ResponseWriter, r *http.Request) {
 	if a.config.BootstrapManager == nil {
 		respondError(w, http.StatusServiceUnavailable, "bootstrap_store_unavailable", "bootstrap store is not configured")
@@ -314,4 +366,13 @@ func decodeTaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error) {
 		return domain.TaskCreateRequest{}, errors.New("issue_prefix is required")
 	}
 	return req, nil
+}
+
+func isAllowedTaskStatus(value string) bool {
+	switch domain.Status(value) {
+	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
 }

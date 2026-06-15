@@ -50,6 +50,9 @@ trekker dep add <task-id> <depends-on-id>
 trekker dep remove <task-id> <depends-on-id>
 trekker dep list <task-id>
 
+### Ready View
+trekker ready [--epic <epic-id>]
+
 ### Locks
 trekker lock acquire <entity-type> <entity-id> [--reason "why"] [--expires 1h]
 trekker lock release <lock-id>
@@ -105,6 +108,7 @@ flowchart TD
 
 ## Session Start
 trekker --toon task list --status in_progress
+trekker --toon ready
 trekker --toon comment list <task-id>
 
 ## Working

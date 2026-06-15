@@ -80,6 +80,37 @@ type TaskCreateResponse struct {
 	WorkspaceID string   `json:"workspace_id"`
 }
 
+type TaskListItem struct {
+	ID           string   `json:"id"`
+	Title        string   `json:"title"`
+	Status       Status   `json:"status"`
+	Priority     Priority `json:"priority"`
+	EpicID       string   `json:"epic_id,omitempty"`
+	ParentTaskID string   `json:"parent_task_id,omitempty"`
+	Tags         []string `json:"tags,omitempty"`
+}
+
+type TaskListResponse struct {
+	ProjectID string         `json:"project_id"`
+	Items     []TaskListItem `json:"items"`
+}
+
+type ReadyListItem struct {
+	ID           string         `json:"id"`
+	Title        string         `json:"title"`
+	Status       Status         `json:"status"`
+	Priority     Priority       `json:"priority"`
+	EpicID       string         `json:"epic_id,omitempty"`
+	ParentTaskID string         `json:"parent_task_id,omitempty"`
+	Tags         []string       `json:"tags,omitempty"`
+	Unblocks     []TaskListItem `json:"unblocks,omitempty"`
+}
+
+type ReadyListResponse struct {
+	ProjectID string          `json:"project_id"`
+	Items     []ReadyListItem `json:"items"`
+}
+
 type Epic struct {
 	ID          string
 	WorkspaceID string

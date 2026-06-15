@@ -72,6 +72,19 @@ issue_prefix=ABC
 title=Write docs
 ```
 
+`ptodo task list --status in_progress --epic epic-1`:
+
+```text
+id=ABC-1 title=Write docs status=in_progress priority=2 epic_id=epic-1
+```
+
+`ptodo ready --epic epic-1`:
+
+```text
+CORE-1 | P1 | Health endpoints and k8s liveness/readiness probes for worker services (EPIC-1) [infra,api]
+  -> unblocks CORE-5 | todo | P1 | Two-tier automated database backups via SCP to NAS and GCS (EPIC-1) [infra]
+```
+
 ### Comments
 
 Render:

@@ -16,17 +16,117 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunAcceptsTrekkerCompatibleTaskCommand(t *testing.T) {
+func TestRunTaskListCallsServer(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
 
-	code := Run([]string{"--toon", "task", "list", "--status", "in_progress"}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d: %s", code, stderr.String())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/projects/default/tasks", r.URL.Path)
+		require.Equal(t, "in_progress", r.URL.Query().Get("status"))
+		require.Equal(t, "epic-1", r.URL.Query().Get("epic"))
+		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
+		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"project_id": "default",
+			"items": []map[string]any{
+				{
+					"id":       "ABC-1",
+					"title":    "Write docs",
+					"status":   "in_progress",
+					"priority": 2,
+					"epic_id":  "epic-1",
+				},
+			},
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := config.LocalConfig{
+		APIURL:       server.URL,
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
 	}
-	if !strings.Contains(stdout.String(), "task list") {
-		t.Fatalf("expected accepted command output, got %q", stdout.String())
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"task", "list", "--status", "in_progress", "--epic", "epic-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "id=ABC-1")
+	require.Contains(t, stdout.String(), "status=in_progress")
+	require.Contains(t, stdout.String(), "epic_id=epic-1")
+}
+
+func TestRunReadyCallsServer(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "/api/v1/projects/default/ready", r.URL.Path)
+		require.Equal(t, "epic-1", r.URL.Query().Get("epic"))
+		require.Equal(t, "key", r.Header.Get("X-Phatodo-Access-Key"))
+		require.Equal(t, "secret", r.Header.Get("X-Phatodo-Access-Secret"))
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"project_id": "default",
+			"items": []map[string]any{
+				{
+					"id":       "CORE-1",
+					"title":    "Health endpoints",
+					"status":   "todo",
+					"priority": 1,
+					"epic_id":  "epic-1",
+					"tags":     []string{"infra", "api"},
+					"unblocks": []map[string]any{
+						{
+							"id":       "CORE-5",
+							"title":    "Backups",
+							"status":   "todo",
+							"priority": 1,
+							"epic_id":  "epic-1",
+							"tags":     []string{"infra"},
+						},
+					},
+				},
+			},
+		})
+	}))
+	t.Cleanup(server.Close)
+
+	cfg := config.LocalConfig{
+		APIURL:       server.URL,
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
 	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"ready", "--epic", "epic-1"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "CORE-1 | P1 | Health endpoints")
+	require.Contains(t, stdout.String(), "-> unblocks CORE-5 | todo | P1 | Backups")
 }
 
 func TestRunInitWritesLocalConfig(t *testing.T) {

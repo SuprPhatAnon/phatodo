@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -128,6 +129,212 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 		ProjectID:   projectID,
 		WorkspaceID: workspaceID,
 	}, nil
+}
+
+func (s *Store) ListTasks(ctx context.Context, projectID string, status string, epicID string) (domain.TaskListResponse, error) {
+	if err := s.ensureProjectExists(ctx, projectID); err != nil {
+		return domain.TaskListResponse{}, err
+	}
+
+	query := strings.Builder{}
+	args := []any{projectID}
+	query.WriteString(`
+		SELECT id, title, status, priority, epic_id, parent_task_id, tags
+		FROM tasks
+		WHERE project_id = $1
+		  AND parent_task_id IS NULL`)
+
+	if status != "" {
+		args = append(args, status)
+		fmt.Fprintf(&query, " AND status = $%d", len(args))
+	}
+	if epicID != "" {
+		args = append(args, epicID)
+		fmt.Fprintf(&query, " AND epic_id = $%d", len(args))
+	}
+
+	query.WriteString(`
+		ORDER BY priority ASC, created_at ASC, id ASC
+	`)
+
+	rows, err := s.pool.Query(ctx, query.String(), args...)
+	if err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("query tasks: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]domain.TaskListItem, 0)
+	for rows.Next() {
+		var item domain.TaskListItem
+		var statusValue string
+		var epicValue sql.NullString
+		var parentValue sql.NullString
+		if err := rows.Scan(&item.ID, &item.Title, &statusValue, &item.Priority, &epicValue, &parentValue, &item.Tags); err != nil {
+			return domain.TaskListResponse{}, fmt.Errorf("scan task list item: %w", err)
+		}
+		item.Status = domain.Status(statusValue)
+		if epicValue.Valid {
+			item.EpicID = epicValue.String
+		}
+		if parentValue.Valid {
+			item.ParentTaskID = parentValue.String
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("iterate tasks: %w", err)
+	}
+
+	return domain.TaskListResponse{
+		ProjectID: projectID,
+		Items:     items,
+	}, nil
+}
+
+func (s *Store) ListReadyTasks(ctx context.Context, projectID string, epicID string) (domain.ReadyListResponse, error) {
+	if err := s.ensureProjectExists(ctx, projectID); err != nil {
+		return domain.ReadyListResponse{}, err
+	}
+
+	readyQuery := strings.Builder{}
+	readyArgs := []any{projectID}
+	readyQuery.WriteString(`
+		SELECT id, title, status, priority, epic_id, parent_task_id, tags
+		FROM tasks t
+		WHERE t.project_id = $1
+		  AND t.parent_task_id IS NULL
+		  AND t.status = 'todo'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM dependencies d
+			JOIN tasks dep ON dep.project_id = d.project_id AND dep.id = d.depends_on_id
+			WHERE d.project_id = t.project_id
+			  AND d.task_id = t.id
+			  AND dep.status NOT IN ('completed', 'wont_fix', 'archived')
+		  )`)
+	if epicID != "" {
+		readyArgs = append(readyArgs, epicID)
+		fmt.Fprintf(&readyQuery, " AND t.epic_id = $%d", len(readyArgs))
+	}
+	readyQuery.WriteString(` ORDER BY t.priority ASC, t.created_at ASC, t.id ASC`)
+
+	rows, err := s.pool.Query(ctx, readyQuery.String(), readyArgs...)
+	if err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("query ready tasks: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]domain.ReadyListItem, 0)
+	readyIDs := make([]string, 0)
+	for rows.Next() {
+		var item domain.ReadyListItem
+		var statusValue string
+		var epicValue sql.NullString
+		var parentValue sql.NullString
+		if err := rows.Scan(&item.ID, &item.Title, &statusValue, &item.Priority, &epicValue, &parentValue, &item.Tags); err != nil {
+			return domain.ReadyListResponse{}, fmt.Errorf("scan ready task: %w", err)
+		}
+		item.Status = domain.Status(statusValue)
+		if epicValue.Valid {
+			item.EpicID = epicValue.String
+		}
+		if parentValue.Valid {
+			item.ParentTaskID = parentValue.String
+		}
+		items = append(items, item)
+		readyIDs = append(readyIDs, item.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("iterate ready tasks: %w", err)
+	}
+
+	if len(readyIDs) == 0 {
+		return domain.ReadyListResponse{
+			ProjectID: projectID,
+			Items:     items,
+		}, nil
+	}
+
+	type blockedRow struct {
+		readyID      string
+		item         domain.TaskListItem
+		status       string
+		epicID       sql.NullString
+		parentTaskID sql.NullString
+	}
+
+	query := strings.Builder{}
+	args := []any{projectID, readyIDs}
+	query.WriteString(`
+		SELECT d.depends_on_id, t.id, t.title, t.status, t.priority, t.epic_id, t.parent_task_id, t.tags
+		FROM dependencies d
+		JOIN tasks t ON t.project_id = d.project_id AND t.id = d.task_id
+		WHERE d.project_id = $1
+		  AND d.depends_on_id = ANY($2::text[])
+		  AND t.parent_task_id IS NULL
+		  AND t.status = 'todo'
+		  AND NOT EXISTS (
+			SELECT 1
+			FROM dependencies d2
+			JOIN tasks dep2 ON dep2.project_id = d2.project_id AND dep2.id = d2.depends_on_id
+			WHERE d2.project_id = t.project_id
+			  AND d2.task_id = t.id
+			  AND d2.depends_on_id <> d.depends_on_id
+			  AND dep2.status NOT IN ('completed', 'wont_fix', 'archived')
+		  )`)
+	if epicID != "" {
+		args = append(args, epicID)
+		fmt.Fprintf(&query, " AND t.epic_id = $%d", len(args))
+	}
+	query.WriteString(`
+		ORDER BY t.priority ASC, t.created_at ASC, t.id ASC`)
+
+	blockedRows, err := s.pool.Query(ctx, query.String(), args...)
+	if err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("query ready dependents: %w", err)
+	}
+	defer blockedRows.Close()
+
+	unblocks := make(map[string][]domain.TaskListItem)
+	for blockedRows.Next() {
+		var row blockedRow
+		if err := blockedRows.Scan(&row.readyID, &row.item.ID, &row.item.Title, &row.status, &row.item.Priority, &row.epicID, &row.parentTaskID, &row.item.Tags); err != nil {
+			return domain.ReadyListResponse{}, fmt.Errorf("scan ready dependent: %w", err)
+		}
+		row.item.Status = domain.Status(row.status)
+		if row.epicID.Valid {
+			row.item.EpicID = row.epicID.String
+		}
+		if row.parentTaskID.Valid {
+			row.item.ParentTaskID = row.parentTaskID.String
+		}
+		unblocks[row.readyID] = append(unblocks[row.readyID], row.item)
+	}
+	if err := blockedRows.Err(); err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("iterate ready dependents: %w", err)
+	}
+
+	for i := range items {
+		if len(unblocks[items[i].ID]) > 0 {
+			items[i].Unblocks = unblocks[items[i].ID]
+		}
+	}
+
+	return domain.ReadyListResponse{
+		ProjectID: projectID,
+		Items:     items,
+	}, nil
+}
+
+func (s *Store) ensureProjectExists(ctx context.Context, projectID string) error {
+	var workspaceID string
+	if err := s.pool.QueryRow(ctx, `SELECT workspace_id FROM projects WHERE id = $1`, projectID).Scan(&workspaceID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrProjectNotFound
+		}
+		return fmt.Errorf("lookup project: %w", err)
+	}
+	return nil
 }
 
 func normalizeIssuePrefix(value string) (string, error) {

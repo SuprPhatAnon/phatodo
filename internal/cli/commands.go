@@ -24,6 +24,7 @@ var commandGroups = []struct {
 	{"subtask", []string{"subtask create", "subtask list", "subtask update", "subtask delete"}},
 	{"comment", []string{"comment add", "comment list", "comment update", "comment delete"}},
 	{"dep", []string{"dep add", "dep remove", "dep list"}},
+	{"workflow", []string{"ready"}},
 	{"config", []string{"config list", "config get", "config set", "config unset"}},
 	{"query", []string{"search", "history", "list"}},
 }
@@ -68,6 +69,12 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	if len(args) >= 2 && args[0] == "config" && args[1] == "unset" {
 		return runConfigUnset(args[2:], stdout, stderr)
+	}
+	if len(args) >= 1 && args[0] == "ready" {
+		return runReady(args[1:], stdout, stderr)
+	}
+	if len(args) >= 2 && args[0] == "task" && args[1] == "list" {
+		return runTaskList(args[2:], stdout, stderr)
 	}
 	if len(args) >= 2 && args[0] == "task" && args[1] == "create" {
 		return runTaskCreate(args[2:], stdout, stderr)
@@ -288,6 +295,107 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 	return 0
 }
 
+func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseTaskListArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := NewAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListTasks(context.Background(), cfg.ProjectID, opts.status, opts.epicID)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	for _, item := range resp.Items {
+		fmt.Fprintf(stdout, "id=%s title=%s status=%s priority=%d", item.ID, item.Title, item.Status, item.Priority)
+		if item.EpicID != "" {
+			fmt.Fprintf(stdout, " epic_id=%s", item.EpicID)
+		}
+		if item.ParentTaskID != "" {
+			fmt.Fprintf(stdout, " parent_task_id=%s", item.ParentTaskID)
+		}
+		if len(item.Tags) > 0 {
+			fmt.Fprintf(stdout, " tags=%s", strings.Join(item.Tags, ","))
+		}
+		fmt.Fprintln(stdout)
+	}
+	return 0
+}
+
+func runReady(args []string, stdout io.Writer, stderr io.Writer) int {
+	opts, err := parseReadyArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := NewAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	resp, err := client.ListReadyTasks(context.Background(), cfg.ProjectID, opts.epicID)
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	for _, item := range resp.Items {
+		fmt.Fprintf(stdout, "%s | P%d | %s", item.ID, item.Priority, item.Title)
+		if item.EpicID != "" {
+			fmt.Fprintf(stdout, " (%s)", item.EpicID)
+		}
+		if len(item.Tags) > 0 {
+			fmt.Fprintf(stdout, " [%s]", strings.Join(item.Tags, ","))
+		}
+		fmt.Fprintln(stdout)
+		for _, blocked := range item.Unblocks {
+			fmt.Fprintf(stdout, "  -> unblocks %s | %s | P%d | %s", blocked.ID, blocked.Status, blocked.Priority, blocked.Title)
+			if blocked.EpicID != "" {
+				fmt.Fprintf(stdout, " (%s)", blocked.EpicID)
+			}
+			if len(blocked.Tags) > 0 {
+				fmt.Fprintf(stdout, " [%s]", strings.Join(blocked.Tags, ","))
+			}
+			fmt.Fprintln(stdout)
+		}
+	}
+	return 0
+}
+
 type taskCreateOptions struct {
 	title              string
 	issuePrefix        string
@@ -382,6 +490,15 @@ func parseJSONStringList(value string) ([]string, error) {
 	return items, nil
 }
 
+func isAllowedTaskStatus(value string) bool {
+	switch domain.Status(value) {
+	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
 func knownCommand(args []string) bool {
 	for _, group := range commandGroups {
 		for _, command := range group.Commands {
@@ -414,4 +531,55 @@ func printHelp(w io.Writer) {
 	for _, group := range commandGroups {
 		fmt.Fprintf(w, "  %-8s %s\n", group.Name, strings.Join(group.Commands, ", "))
 	}
+}
+
+type taskListOptions struct {
+	status string
+	epicID string
+}
+
+func parseTaskListArgs(args []string) (taskListOptions, error) {
+	fs := flag.NewFlagSet("task list", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var status string
+	var epicID string
+	fs.StringVar(&status, "status", "", "")
+	fs.StringVar(&epicID, "epic", "", "")
+
+	if err := fs.Parse(args); err != nil {
+		return taskListOptions{}, fmt.Errorf("invalid task list flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return taskListOptions{}, fmt.Errorf("task list does not accept positional arguments")
+	}
+	if status != "" && !isAllowedTaskStatus(status) {
+		return taskListOptions{}, fmt.Errorf("task list status must be todo, in_progress, completed, wont_fix, or archived")
+	}
+
+	return taskListOptions{
+		status: status,
+		epicID: epicID,
+	}, nil
+}
+
+type readyOptions struct {
+	epicID string
+}
+
+func parseReadyArgs(args []string) (readyOptions, error) {
+	fs := flag.NewFlagSet("ready", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var epicID string
+	fs.StringVar(&epicID, "epic", "", "")
+
+	if err := fs.Parse(args); err != nil {
+		return readyOptions{}, fmt.Errorf("invalid ready flags: %w", err)
+	}
+	if fs.NArg() > 0 {
+		return readyOptions{}, fmt.Errorf("ready does not accept positional arguments")
+	}
+
+	return readyOptions{epicID: epicID}, nil
 }

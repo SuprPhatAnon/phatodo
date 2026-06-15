@@ -13,6 +13,8 @@ type Config struct {
 	ProjectConfigReader ProjectConfigReader
 	ProjectConfigWriter ProjectConfigWriter
 	TaskCreator         TaskCreator
+	TaskLister          TaskLister
+	ReadyLister         ReadyLister
 	BootstrapManager    BootstrapManager
 }
 
@@ -28,6 +30,14 @@ type ProjectConfigWriter interface {
 
 type TaskCreator interface {
 	CreateTask(context.Context, string, domain.TaskCreateRequest, string) (domain.TaskCreateResponse, error)
+}
+
+type TaskLister interface {
+	ListTasks(context.Context, string, string, string) (domain.TaskListResponse, error)
+}
+
+type ReadyLister interface {
+	ListReadyTasks(context.Context, string, string) (domain.ReadyListResponse, error)
 }
 
 type BootstrapManager interface {

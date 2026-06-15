@@ -53,7 +53,7 @@ func (a *app) registerEpicRoutes(mux *http.ServeMux) {
 }
 
 func (a *app) registerTaskRoutes(mux *http.ServeMux) {
-	mux.Handle("GET /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.list"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.listTasks)))
 	mux.Handle("POST /api/v1/projects/{projectID}/tasks", a.withAPIAuth(http.HandlerFunc(a.createTask)))
 	mux.Handle("GET /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.show"))))
 	mux.Handle("PATCH /api/v1/projects/{projectID}/tasks/{taskID}", a.withAPIAuth(http.HandlerFunc(a.notImplemented("task.update"))))
@@ -86,4 +86,5 @@ func (a *app) registerQueryRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /api/v1/projects/{projectID}/search", a.withAPIAuth(http.HandlerFunc(a.notImplemented("search"))))
 	mux.Handle("GET /api/v1/projects/{projectID}/history", a.withAPIAuth(http.HandlerFunc(a.notImplemented("history"))))
 	mux.Handle("GET /api/v1/projects/{projectID}/list", a.withAPIAuth(http.HandlerFunc(a.notImplemented("list"))))
+	mux.Handle("GET /api/v1/projects/{projectID}/ready", a.withAPIAuth(http.HandlerFunc(a.listReadyTasks)))
 }

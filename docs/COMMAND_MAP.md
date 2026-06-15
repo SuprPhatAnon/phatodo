@@ -17,7 +17,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo epic complete`
 - [ ] `ptodo epic delete`
 - [x] `ptodo task create`
-- [ ] `ptodo task list`
+- [x] `ptodo task list`
 - [ ] `ptodo task show`
 - [ ] `ptodo task update`
 - [ ] `ptodo task delete`
@@ -32,6 +32,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo dep add`
 - [ ] `ptodo dep remove`
 - [ ] `ptodo dep list`
+- [x] `ptodo ready`
 - [ ] `ptodo lock acquire`
 - [ ] `ptodo lock release`
 - [ ] `ptodo lock list`
@@ -69,7 +70,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
 | `ptodo task create` | `POST /api/v1/projects/{projectID}/tasks` | `tasks` | `events`, `search_index`, `id_counters` if ID generation is server-side; `issue_prefix` must be supplied in the create payload. |
-| `ptodo task list` | `GET /api/v1/projects/{projectID}/tasks` | `tasks` | May read `search_index` for filters. |
+| `ptodo task list` | `GET /api/v1/projects/{projectID}/tasks` | `tasks` | None. Returns top-level tasks unless a subtask-specific command is used. |
 | `ptodo task show` | `GET /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | None. |
 | `ptodo task update` | `PATCH /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | `events`, `search_index`. |
 | `ptodo task delete` | `DELETE /api/v1/projects/{projectID}/tasks/{taskID}` | `tasks` | `comments`, `dependencies`, `events`, `search_index`, and any active `work_item_locks` cleanup. |
@@ -99,6 +100,12 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 | `ptodo dep add` | `POST /api/v1/projects/{projectID}/tasks/{taskID}/dependencies` | `dependencies` | `events`. |
 | `ptodo dep remove` | `DELETE /api/v1/projects/{projectID}/tasks/{taskID}/dependencies/{dependsOnID}` | `dependencies` | `events`. |
 | `ptodo dep list` | `GET /api/v1/projects/{projectID}/tasks/{taskID}/dependencies` | `dependencies` | None. |
+
+## Workflow
+
+| Command | API endpoint | Primary tables | Adjunct tables / notes |
+| --- | --- | --- | --- |
+| `ptodo ready` | `GET /api/v1/projects/{projectID}/ready` | `tasks`, `dependencies` | Returns top-level `todo` tasks ordered by priority and includes any top-level tasks that would become ready if the row completed. May read dependency state from `tasks` for status checks. |
 
 ## Config
 

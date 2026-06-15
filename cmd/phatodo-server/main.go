@@ -23,6 +23,8 @@ func main() {
 	var projectConfigStore server.ProjectConfigReader
 	var projectConfigWriter server.ProjectConfigWriter
 	var taskCreator server.TaskCreator
+	var taskLister server.TaskLister
+	var readyLister server.ReadyLister
 	var bootstrapManager server.BootstrapManager
 	if postgresDSN != "" {
 		store, err := postgres.NewStore(ctx, postgresDSN)
@@ -34,6 +36,8 @@ func main() {
 		projectConfigStore = store
 		projectConfigWriter = store
 		taskCreator = store
+		taskLister = store
+		readyLister = store
 		bootstrapManager = store
 	}
 
@@ -43,6 +47,8 @@ func main() {
 		ProjectConfigReader: projectConfigStore,
 		ProjectConfigWriter: projectConfigWriter,
 		TaskCreator:         taskCreator,
+		TaskLister:          taskLister,
+		ReadyLister:         readyLister,
 		BootstrapManager:    bootstrapManager,
 	})
 

@@ -10,6 +10,7 @@ The `ptodo` executable should keep the command shape preserved in `docs/trekker_
 - Subtasks: `subtask create`, `subtask list`, `subtask update`, `subtask delete`
 - Comments: `comment add`, `comment list`, `comment update`, `comment delete`
 - Dependencies: `dep add`, `dep remove`, `dep list`
+- Workflow: `ready`
 - Config: `config list`, `config get`, `config set`, `config unset`
 - Query: `search`, `history`, `list`
 
@@ -18,6 +19,7 @@ The `ptodo` executable should keep the command shape preserved in `docs/trekker_
 Support `--toon` for compact agent output. Preserve status values, priority values, and task workflow rules from the Trekker reference. Prefer additive enhancements over breaking command changes.
 
 `config list` is the first server-backed command and should print the project configuration returned from `/api/v1/projects/{projectID}/config`.
+`ready` should print top-level todo tasks that are currently unblocked, ordered by priority, with optional `--epic` scoping and inline `unblocks` hints for tasks that become available next.
 
 ## Schema-Driven Extensions
 

@@ -39,7 +39,7 @@ func TestAPIRoutesRequireCredentials(t *testing.T) {
 func TestAPIRouteScaffoldReturnsAction(t *testing.T) {
 	handler := newApp(Config{}).routes()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/epics", nil)
 	req.Header.Set(AccessKeyHeader, "key")
 	req.Header.Set(AccessSecretHeader, "secret")
 	rec := httptest.NewRecorder()
@@ -53,8 +53,8 @@ func TestAPIRouteScaffoldReturnsAction(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body["action"] != "task.list" {
-		t.Fatalf("expected task.list action, got %#v", body["action"])
+	if body["action"] != "epic.list" {
+		t.Fatalf("expected epic.list action, got %#v", body["action"])
 	}
 	if body["project_id"] != "project-1" {
 		t.Fatalf("expected project id, got %#v", body["project_id"])
@@ -208,6 +208,24 @@ func (f fakeTaskCreator) CreateTask(_ context.Context, _ string, _ domain.TaskCr
 	return f.createResponse, f.createErr
 }
 
+type fakeTaskLister struct {
+	listResponse domain.TaskListResponse
+	listErr      error
+}
+
+func (f fakeTaskLister) ListTasks(_ context.Context, _ string, _ string, _ string) (domain.TaskListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
+type fakeReadyLister struct {
+	listResponse domain.ReadyListResponse
+	listErr      error
+}
+
+func (f fakeReadyLister) ListReadyTasks(_ context.Context, _ string, _ string) (domain.ReadyListResponse, error) {
+	return f.listResponse, f.listErr
+}
+
 func TestAdminInitReturnsCreatedAdmin(t *testing.T) {
 	handler := newApp(Config{
 		BootstrapManager: fakeBootstrapManager{
@@ -290,4 +308,110 @@ func TestTaskCreateReturnsTask(t *testing.T) {
 	require.Equal(t, "ABC-1", body["id"])
 	require.Equal(t, "ABC", body["issue_prefix"])
 	require.Equal(t, "Write docs", body["title"])
+}
+
+func TestTaskListReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		TaskLister: fakeTaskLister{
+			listResponse: domain.TaskListResponse{
+				ProjectID: "project-1",
+				Items: []domain.TaskListItem{
+					{
+						ID:       "ABC-1",
+						Title:    "Write docs",
+						Status:   domain.StatusInProgress,
+						Priority: domain.PriorityMedium,
+						EpicID:   "epic-1",
+					},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/tasks?status=in_progress&epic=epic-1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "ABC-1", item["id"])
+	require.Equal(t, "Write docs", item["title"])
+	require.Equal(t, "in_progress", item["status"])
+	require.Equal(t, float64(2), item["priority"])
+	require.Equal(t, "epic-1", item["epic_id"])
+}
+
+func TestReadyReturnsItems(t *testing.T) {
+	handler := newApp(Config{
+		ReadyLister: fakeReadyLister{
+			listResponse: domain.ReadyListResponse{
+				ProjectID: "project-1",
+				Items: []domain.ReadyListItem{
+					{
+						ID:       "CORE-1",
+						Title:    "Health endpoints",
+						Status:   domain.StatusTodo,
+						Priority: domain.PriorityHigh,
+						EpicID:   "epic-1",
+						Tags:     []string{"infra", "api"},
+						Unblocks: []domain.TaskListItem{
+							{
+								ID:       "CORE-5",
+								Title:    "Backups",
+								Status:   domain.StatusTodo,
+								Priority: domain.PriorityHigh,
+								EpicID:   "epic-1",
+								Tags:     []string{"infra"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/ready?epic=epic-1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "project-1", body["project_id"])
+
+	items, ok := body["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	item, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "CORE-1", item["id"])
+	require.Equal(t, "Health endpoints", item["title"])
+	require.Equal(t, "todo", item["status"])
+	require.Equal(t, float64(1), item["priority"])
+
+	unblocks, ok := item["unblocks"].([]any)
+	require.True(t, ok)
+	require.Len(t, unblocks, 1)
+	blocked, ok := unblocks[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "CORE-5", blocked["id"])
+	require.Equal(t, "Backups", blocked["title"])
 }

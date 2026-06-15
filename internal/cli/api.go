@@ -125,6 +125,95 @@ func (c *APIClient) CreateTask(ctx context.Context, projectID string, req domain
 	return payload, nil
 }
 
+func (c *APIClient) ListTasks(ctx context.Context, projectID string, status string, epicID string) (domain.TaskListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "tasks")
+	query := endpoint.Query()
+	if status != "" {
+		query.Set("status", status)
+	}
+	if epicID != "" {
+		query.Set("epic", epicID)
+	}
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("call api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		message := resp.Status
+		if msg, ok := body["message"].(string); ok && msg != "" {
+			message = msg
+		}
+		if code, ok := body["error"].(string); ok && code != "" {
+			return domain.TaskListResponse{}, fmt.Errorf("%s: %s", code, message)
+		}
+		return domain.TaskListResponse{}, fmt.Errorf("list tasks failed: %s", message)
+	}
+
+	var payload domain.TaskListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.TaskListResponse{}, fmt.Errorf("decode task list response: %w", err)
+	}
+
+	return payload, nil
+}
+
+func (c *APIClient) ListReadyTasks(ctx context.Context, projectID string, epicID string) (domain.ReadyListResponse, error) {
+	endpoint := *c.baseURL
+	endpoint.Path = path.Join(strings.TrimRight(c.baseURL.Path, "/"), "/api/v1/projects", url.PathEscape(projectID), "ready")
+	query := endpoint.Query()
+	if epicID != "" {
+		query.Set("epic", epicID)
+	}
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	if err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("call api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		message := resp.Status
+		if msg, ok := body["message"].(string); ok && msg != "" {
+			message = msg
+		}
+		if code, ok := body["error"].(string); ok && code != "" {
+			return domain.ReadyListResponse{}, fmt.Errorf("%s: %s", code, message)
+		}
+		return domain.ReadyListResponse{}, fmt.Errorf("ready list failed: %s", message)
+	}
+
+	var payload domain.ReadyListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.ReadyListResponse{}, fmt.Errorf("decode ready response: %w", err)
+	}
+
+	return payload, nil
+}
+
 func (c *APIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
 	var payload adminInitResponse
 	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/admin/init", req, &payload); err != nil {
