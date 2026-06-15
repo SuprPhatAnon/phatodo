@@ -6,7 +6,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: phatodo.example.com
+    - host: todo.phat.wtf
       http:
         paths:
           - path: /
