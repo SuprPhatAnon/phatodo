@@ -38,11 +38,12 @@ The manifests in `deploy/k3s/` deploy:
 - `phatodo-server` Deployment and Service
 - Postgres StatefulSet and Service
 - Postgres Secret
+- A one-shot migration Job that waits for Postgres, applies `migrations/0001_initial.sql`, and writes a `schema_migrations` marker
 - Traefik Ingress over plain HTTP by default
 
 TLS is optional. The checked-in k3s bundle does not require cert-manager or a certificate issuer to be present. If you want HTTPS later, add a separate TLS overlay or manifest rather than changing the default deployment path.
 
-Run database migrations separately after Postgres is available. The current server image includes `migrations/`, but no migration runner has been implemented yet.
+`make deploy-k3s` now creates the namespace, refreshes the migration configmap, runs the migration Job, and then waits for the server rollout. The server pod also has an init container that waits for Postgres and the migration marker before starting.
 
 The checked-in k3s bundle targets the `phatodo` namespace and pulls `localhost:30500/phatodo:$(TAG)` by default. The Makefile still builds and pushes the image to `$(REGISTRY)/phatodo:$(TAG)` for the registry side of the workflow. If you change `REGISTRY`, `TAG`, or `KUBE_NAMESPACE`, use the same values when deploying.
 
@@ -52,4 +53,4 @@ Apply and wait for rollout with:
 make deploy-k3s
 ```
 
-The deploy target creates `$(KUBE_NAMESPACE)` first with an idempotent `kubectl create namespace ... --dry-run=client -o yaml | kubectl apply -f -` step, then applies the k3s bundle, updates the `phatodo-server` image to `$(KUBE_IMAGE)`, and waits for the rollout to finish.
+The deploy target creates `$(KUBE_NAMESPACE)` first with an idempotent `kubectl create namespace ... --dry-run=client -o yaml | kubectl apply -f -` step, refreshes the `phatodo-migrations` configmap from `migrations/0001_initial.sql`, deletes any previous migration Job, applies the k3s bundle, waits for `job/phatodo-migrate` to complete, updates the `phatodo-server` image to `$(KUBE_IMAGE)`, and waits for the rollout to finish.

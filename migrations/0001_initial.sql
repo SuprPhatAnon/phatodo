@@ -137,6 +137,15 @@ CREATE TABLE IF NOT EXISTS work_item_locks (
     FOREIGN KEY (workspace_id, project_id) REFERENCES projects(workspace_id, id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO schema_migrations (version)
+VALUES ('0001_initial')
+ON CONFLICT (version) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,

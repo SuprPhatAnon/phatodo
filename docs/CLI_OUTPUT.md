@@ -67,7 +67,7 @@ Render:
 - assigned owner
 - parent or epic relation
 
-`ptodo task create -t "Write docs" --issue-prefix ABC`:
+`ptodo task create -t "Write docs" --prefix ABC`:
 
 ```text
 - id: ABC-1

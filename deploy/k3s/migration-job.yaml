@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: phatodo-migrate
+  namespace: phatodo
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: phatodo-migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PHATODO_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: phatodo-postgres
+                  key: url
+          command:
+            - sh
+            - -ec
+            - |
+              until pg_isready -d "$PHATODO_DATABASE_URL"; do
+                sleep 2
+              done
+              psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -f /migrations/0001_initial.sql
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: phatodo-migrations

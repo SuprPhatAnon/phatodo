@@ -2143,7 +2143,8 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	fs.SetOutput(io.Discard)
 
 	var title string
-	var issuePrefix string
+	var issuePrefixShort string
+	var issuePrefixLong string
 	var description string
 	var epicID string
 	var tagsValue string
@@ -2153,7 +2154,8 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 
 	fs.StringVar(&title, "t", "", "")
 	fs.StringVar(&title, "title", "", "")
-	fs.StringVar(&issuePrefix, "issue-prefix", "", "")
+	fs.StringVar(&issuePrefixShort, "prefix", "", "")
+	fs.StringVar(&issuePrefixLong, "issue-prefix", "", "")
 	fs.StringVar(&description, "d", "", "")
 	fs.StringVar(&description, "description", "", "")
 	fs.IntVar(&priority, "p", int(domain.PriorityMedium), "")
@@ -2174,8 +2176,9 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	if title == "" {
 		return taskCreateOptions{}, fmt.Errorf("task create requires -t <title>")
 	}
+	issuePrefix := firstNonEmpty(issuePrefixShort, issuePrefixLong)
 	if issuePrefix == "" {
-		return taskCreateOptions{}, fmt.Errorf("task create requires --issue-prefix <prefix>")
+		return taskCreateOptions{}, fmt.Errorf("task create requires --prefix <prefix>")
 	}
 
 	tags := parseCSVList(tagsValue)

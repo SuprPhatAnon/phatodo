@@ -95,6 +95,9 @@ Required input:
 Prompts:
 - admin password
 
+Optional input:
+- `--project <name>` or legacy `--project-name <name>`
+
 Contract:
 - authenticate as the existing admin user
 - create the workspace and project if they do not already exist
@@ -203,7 +206,7 @@ Server request:
 
 Required input:
 - `-t <title>`
-- `--issue-prefix <prefix>`
+- `--prefix <prefix>` or legacy `--issue-prefix <prefix>`
 
 Optional input:
 - `-d <description>`

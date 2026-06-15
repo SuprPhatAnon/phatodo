@@ -33,6 +33,12 @@ Use the configured Makefile target:
 make run-ptodo
 ```
 
+To install the CLI into `$(GOPATH)/bin` for use from your `PATH`, run:
+
+```sh
+make install
+```
+
 ## Initial Bring-Up
 
 Recommended order:

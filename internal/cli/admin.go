@@ -188,14 +188,16 @@ func parseAdminBootstrapArgs(args []string) (adminBootstrapOptions, error) {
 	var apiURLShort string
 	var apiURLLong string
 	var workspaceName string
-	var projectName string
+	var projectNameShort string
+	var projectNameLong string
 
 	fs.StringVar(&usernameShort, "u", "", "")
 	fs.StringVar(&usernameLong, "username", "", "")
 	fs.StringVar(&apiURLShort, "url", "", "")
 	fs.StringVar(&apiURLLong, "api-url", "", "")
 	fs.StringVar(&workspaceName, "workspace-name", "", "")
-	fs.StringVar(&projectName, "project-name", "", "")
+	fs.StringVar(&projectNameShort, "project", "", "")
+	fs.StringVar(&projectNameLong, "project-name", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return adminBootstrapOptions{}, fmt.Errorf("invalid admin bootstrap flags: %w", err)
@@ -212,6 +214,7 @@ func parseAdminBootstrapArgs(args []string) (adminBootstrapOptions, error) {
 	if apiURL == "" {
 		return adminBootstrapOptions{}, fmt.Errorf("admin bootstrap requires --url <api-server-url>")
 	}
+	projectName := firstNonEmpty(projectNameShort, projectNameLong)
 
 	return adminBootstrapOptions{
 		username:      username,

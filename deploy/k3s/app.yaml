@@ -26,6 +26,26 @@ spec:
       labels:
         app: phatodo-server
     spec:
+      initContainers:
+        - name: wait-for-database-and-migrations
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PHATODO_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: phatodo-postgres
+                  key: url
+          command:
+            - sh
+            - -ec
+            - |
+              until pg_isready -d "$PHATODO_DATABASE_URL"; do
+                sleep 2
+              done
+              until psql "$PHATODO_DATABASE_URL" -Atqc "SELECT 1 FROM schema_migrations WHERE version = '0001_initial'" | grep -qx 1; do
+                sleep 2
+              done
       containers:
         - name: phatodo-server
           image: localhost:30500/phatodo:latest

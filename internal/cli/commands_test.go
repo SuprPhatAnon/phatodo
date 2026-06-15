@@ -1041,6 +1041,53 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "title: \"Write docs\"")
 }
 
+func TestRunTaskCreateAcceptsPrefixAlias(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createTaskFn: func(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, "default", projectID)
+				require.Equal(t, "ABC", req.IssuePrefix)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-1",
+					IssuePrefix: "ABC",
+					Title:       "Write docs",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "create", "-t", "Write docs", "--prefix", "ABC"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+}
+
 func TestRunSubtaskCreateCallsServer(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1793,6 +1840,47 @@ func TestRunAdminBootstrapWritesLocalConfig(t *testing.T) {
 	require.Contains(t, stdout.String(), "- workspace_id: ws_1")
 	require.Contains(t, stdout.String(), "project_id: prj_1")
 	require.Contains(t, stdout.String(), "config_path:")
+}
+
+func TestRunAdminBootstrapAcceptsProjectAlias(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldPrompt := readPasswordPrompt
+	readPasswordPrompt = func(prompt string, _ io.Writer) (string, error) {
+		return "secret", nil
+	}
+	t.Cleanup(func() { readPasswordPrompt = oldPrompt })
+
+	var got domain.AdminBootstrapRequest
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			bootstrapAdminFn: func(ctx context.Context, req domain.AdminBootstrapRequest) (domain.AdminBootstrapResponse, error) {
+				got = req
+				return domain.AdminBootstrapResponse{
+					WorkspaceID:  "ws_1",
+					ProjectID:    "prj_1",
+					AccessKey:    "key_1",
+					AccessSecret: "sec_1",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	code := Run([]string{"--toon", "admin", "bootstrap", "-u", "alice", "--url", "http://example.invalid", "--project", "renamed"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Equal(t, "renamed", got.ProjectName)
+	require.Equal(t, "phatodo", got.WorkspaceName)
 }
 
 func TestRunAdminBootstrapStopsWhenConfigExists(t *testing.T) {

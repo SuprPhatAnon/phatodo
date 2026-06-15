@@ -17,13 +17,14 @@ K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
 GOMODCACHE ?= /tmp/phatodo-go-mod
 
-.PHONY: help build build-cli build-server test test-cli test-server run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
+.PHONY: help build build-cli build-server install test test-cli test-server run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
 
 help:
 	@echo "Targets:"
 	@echo "  build         Build CLI and server binaries"
 	@echo "  build-cli     Build the ptodo CLI"
 	@echo "  build-server  Build the phatodo-server API/dashboard"
+	@echo "  install       Build and install the ptodo CLI into $(GOPATH)/bin"
 	@echo "  test          Run all Go tests"
 	@echo "  test-cli      Run CLI package tests"
 	@echo "  test-server   Run server package tests"
@@ -48,6 +49,10 @@ build-cli:
 build-server:
 	@mkdir -p $(BIN_DIR)
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/phatodo-server ./cmd/phatodo-server
+
+install: build-cli
+	@mkdir -p $(GOPATH)/bin
+	install -m 0755 $(BIN_DIR)/ptodo $(GOPATH)/bin/ptodo
 
 test:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./...
@@ -90,7 +95,10 @@ deploy: deploy-k3s
 
 deploy-k3s:
 	kubectl create namespace $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create configmap phatodo-migrations --from-file=0001_initial.sql=migrations/0001_initial.sql -n $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl delete job phatodo-migrate -n $(KUBE_NAMESPACE) --ignore-not-found
 	kubectl apply -k $(K3S_DIR) -n $(KUBE_NAMESPACE)
+	kubectl wait --for=condition=complete job/phatodo-migrate -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)
 	kubectl set image deployment/phatodo-server phatodo-server=$(KUBE_IMAGE) -n $(KUBE_NAMESPACE)
 	kubectl rollout status deployment/phatodo-server -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)
 
