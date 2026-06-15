@@ -91,6 +91,16 @@ func (c *APIClient) ListProjectConfig(ctx context.Context, projectID string) ([]
 	return payload.Items, nil
 }
 
+func (c *APIClient) SetProjectConfig(ctx context.Context, projectID string, key string, value string) (ProjectConfigItem, error) {
+	var payload ProjectConfigItem
+	if err := c.doJSON(ctx, http.MethodPut, fmt.Sprintf("/api/v1/projects/%s/config/%s", url.PathEscape(projectID), url.PathEscape(key)), domain.ProjectConfigSetRequest{
+		Value: value,
+	}, &payload); err != nil {
+		return ProjectConfigItem{}, err
+	}
+	return payload, nil
+}
+
 func (c *APIClient) InitAdmin(ctx context.Context, req domain.AdminInitRequest) (domain.AdminInitResponse, error) {
 	var payload adminInitResponse
 	if err := c.doJSON(ctx, http.MethodPost, "/api/v1/admin/init", req, &payload); err != nil {
@@ -135,6 +145,12 @@ func (c *APIClient) doJSON(ctx context.Context, method string, requestPath strin
 		return fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if c.accessKey != "" {
+		req.Header.Set("X-Phatodo-Access-Key", c.accessKey)
+	}
+	if c.accessSecret != "" {
+		req.Header.Set("X-Phatodo-Access-Secret", c.accessSecret)
+	}
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {

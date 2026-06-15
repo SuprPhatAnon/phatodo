@@ -8,7 +8,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 - [ ] `ptodo admin bootstrap`
 - [x] `ptodo config list`
 - [ ] `ptodo config get`
-- [ ] `ptodo config set`
+- [x] `ptodo config set`
 - [ ] `ptodo config unset`
 - [ ] `ptodo epic create`
 - [ ] `ptodo epic list`

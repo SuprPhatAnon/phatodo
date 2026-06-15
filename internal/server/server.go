@@ -11,11 +11,16 @@ type Config struct {
 	Addr                string
 	PostgresDSN         string
 	ProjectConfigReader ProjectConfigReader
+	ProjectConfigWriter ProjectConfigWriter
 	BootstrapManager    BootstrapManager
 }
 
 type ProjectConfigReader interface {
 	ListProjectConfig(context.Context, string) ([]domain.ProjectConfig, error)
+}
+
+type ProjectConfigWriter interface {
+	SetProjectConfig(context.Context, string, string, string) (domain.ProjectConfig, error)
 }
 
 type BootstrapManager interface {

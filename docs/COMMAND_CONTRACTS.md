@@ -424,6 +424,9 @@ Server request:
 Expected body fields:
 - `value`
 
+Response:
+- the stored `{key, value}` row for the project config entry
+
 ### `ptodo config unset`
 
 Required input:

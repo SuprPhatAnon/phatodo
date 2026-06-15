@@ -35,6 +35,12 @@ Rules:
 issue_prefix=ABC
 ```
 
+`ptodo config set issue_prefix ABC`:
+
+```text
+issue_prefix=ABC
+```
+
 ### Tasks and epics
 
 Render:

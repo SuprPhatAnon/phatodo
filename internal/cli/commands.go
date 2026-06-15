@@ -57,6 +57,9 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) >= 2 && args[0] == "config" && args[1] == "list" {
 		return runConfigList(stdout, stderr)
 	}
+	if len(args) >= 2 && args[0] == "config" && args[1] == "set" {
+		return runConfigSet(args[2:], stdout, stderr)
+	}
 
 	if knownCommand(args) {
 		fmt.Fprintf(stdout, "ptodo command scaffold accepted: %s\n", strings.Join(args, " "))
@@ -119,6 +122,40 @@ func runConfigList(stdout io.Writer, stderr io.Writer) int {
 	for _, item := range items {
 		fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
 	}
+	return 0
+}
+
+func runConfigSet(args []string, stdout io.Writer, stderr io.Writer) int {
+	if len(args) != 2 {
+		fmt.Fprintln(stderr, "usage: ptodo config set <key> <value>")
+		return 2
+	}
+
+	workdir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to determine working directory: %v\n", err)
+		return 1
+	}
+
+	cfg, _, err := config.ReadLocal(workdir)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to read local config: %v\n", err)
+		return 1
+	}
+
+	client, err := NewAPIClient(cfg)
+	if err != nil {
+		fmt.Fprintf(stderr, "failed to initialize api client: %v\n", err)
+		return 1
+	}
+
+	item, err := client.SetProjectConfig(context.Background(), cfg.ProjectID, args[0], args[1])
+	if err != nil {
+		fmt.Fprintf(stderr, "%v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "%s=%s\n", item.Key, item.Value)
 	return 0
 }
 

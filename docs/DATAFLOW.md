@@ -52,14 +52,14 @@ The Makefile also pins build/runtime helpers:
 - `GOCACHE`
 - `GOMODCACHE`
 
-## Current End-to-End Flow: `config list`
+## Current End-to-End Flow: `config list` and `config set`
 
-The first wired command path is `ptodo config list`.
+The first wired command paths are `ptodo config list` and `ptodo config set`.
 
 ### 1. Command entry
 
 - `cmd/ptodo/main.go` calls `cli.Run`.
-- `internal/cli/commands.go` recognizes `config list`.
+- `internal/cli/commands.go` recognizes `config list` and `config set`.
 
 ### 2. Local config load
 
@@ -112,6 +112,8 @@ The CLI prints that as:
 ```text
 issue_prefix=ABC
 ```
+
+For `ptodo config set`, the server responds with the stored `{key, value}` row and the CLI prints the same `key=value` line for confirmation.
 
 ## Bootstrap Flow
 

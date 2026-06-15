@@ -55,6 +55,38 @@ func (a *app) listProjectConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (a *app) setProjectConfig(w http.ResponseWriter, r *http.Request) {
+	if a.config.ProjectConfigWriter == nil {
+		respondError(w, http.StatusServiceUnavailable, "config_store_unavailable", "project config store is not configured")
+		return
+	}
+
+	projectID := r.PathValue("projectID")
+	key := r.PathValue("key")
+	if key == "" {
+		respondError(w, http.StatusBadRequest, "invalid_request", "config key is required")
+		return
+	}
+
+	req, err := decodeProjectConfigSetRequest(r.Body)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		return
+	}
+
+	item, err := a.config.ProjectConfigWriter.SetProjectConfig(r.Context(), projectID, key, req.Value)
+	if err != nil {
+		if errors.Is(err, postgres.ErrProjectNotFound) {
+			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "project_config_set_failed", err.Error())
+		return
+	}
+
+	respondJSON(w, http.StatusOK, item)
+}
+
 func (a *app) adminInit(w http.ResponseWriter, r *http.Request) {
 	if a.config.BootstrapManager == nil {
 		respondError(w, http.StatusServiceUnavailable, "bootstrap_store_unavailable", "bootstrap store is not configured")
@@ -175,6 +207,14 @@ func decodeAdminBootstrapRequest(body io.Reader) (domain.AdminBootstrapRequest, 
 	}
 	if req.IssuePrefix == "" {
 		return domain.AdminBootstrapRequest{}, errors.New("issue_prefix is required")
+	}
+	return req, nil
+}
+
+func decodeProjectConfigSetRequest(body io.Reader) (domain.ProjectConfigSetRequest, error) {
+	var req domain.ProjectConfigSetRequest
+	if err := json.NewDecoder(body).Decode(&req); err != nil {
+		return domain.ProjectConfigSetRequest{}, err
 	}
 	return req, nil
 }

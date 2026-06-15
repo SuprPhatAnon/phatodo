@@ -6,8 +6,11 @@ import (
 	"fmt"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+var ErrProjectNotFound = errors.New("project not found")
 
 type Store struct {
 	pool *pgxpool.Pool
@@ -67,4 +70,34 @@ func (s *Store) ListProjectConfig(ctx context.Context, projectID string) ([]doma
 	}
 
 	return items, nil
+}
+
+func (s *Store) SetProjectConfig(ctx context.Context, projectID string, key string, value string) (domain.ProjectConfig, error) {
+	var item domain.ProjectConfig
+	err := s.pool.QueryRow(ctx, `
+		WITH project_row AS (
+			SELECT workspace_id
+			FROM projects
+			WHERE id = $1
+		), upserted AS (
+			INSERT INTO project_config (
+				workspace_id, project_id, key, value
+			)
+			SELECT workspace_id, $1, $2, $3
+			FROM project_row
+			ON CONFLICT (project_id, key) DO UPDATE
+			SET value = EXCLUDED.value,
+				updated_at = now()
+			RETURNING key, value
+		)
+		SELECT key, value FROM upserted
+	`, projectID, key, value).Scan(&item.Key, &item.Value)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProjectConfig{}, ErrProjectNotFound
+		}
+		return domain.ProjectConfig{}, fmt.Errorf("set project config: %w", err)
+	}
+
+	return item, nil
 }

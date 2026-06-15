@@ -70,6 +70,15 @@ func (f fakeProjectConfigReader) ListProjectConfig(_ context.Context, _ string) 
 	return f.items, f.err
 }
 
+type fakeProjectConfigWriter struct {
+	item domain.ProjectConfig
+	err  error
+}
+
+func (f fakeProjectConfigWriter) SetProjectConfig(_ context.Context, _ string, _ string, _ string) (domain.ProjectConfig, error) {
+	return f.item, f.err
+}
+
 func TestProjectConfigListReturnsItems(t *testing.T) {
 	handler := newApp(Config{
 		ProjectConfigReader: fakeProjectConfigReader{
@@ -98,6 +107,28 @@ func TestProjectConfigListReturnsItems(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "issue_prefix", item["key"])
 	require.Equal(t, "ABC", item["value"])
+}
+
+func TestProjectConfigSetReturnsItem(t *testing.T) {
+	handler := newApp(Config{
+		ProjectConfigWriter: fakeProjectConfigWriter{
+			item: domain.ProjectConfig{Key: "issue_prefix", Value: "ABC"},
+		},
+	}).routes()
+
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/projects/project-1/config/issue_prefix", strings.NewReader(`{"value":"ABC"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, "issue_prefix", body["key"])
+	require.Equal(t, "ABC", body["value"])
 }
 
 type fakeBootstrapManager struct {

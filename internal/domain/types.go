@@ -87,6 +87,10 @@ type ProjectConfig struct {
 	Value string `json:"value"`
 }
 
+type ProjectConfigSetRequest struct {
+	Value string `json:"value"`
+}
+
 type AdminInitRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
