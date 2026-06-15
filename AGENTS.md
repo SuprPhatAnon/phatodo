@@ -52,11 +52,43 @@ Pull requests should include a brief summary, the reason for the change, any com
 
 For agent workflows, use `docs/trekker_reference.txt` as the behavioral reference. Preserve the documented Trekker command shape unless a design note explicitly changes it. The server is the source of truth; local `.phatodo` data should be limited to client config and optional cache data.
 
+## Mandatory Task Workflow
+
+- The required task lifecycle is:
+  - `ptodo --toon ready` or `ptodo --toon list`
+  - pick one real task
+  - `ptodo task update <TASK_ID> -s in_progress`
+  - do the work
+  - if paused, blocked, or handed off, add a checkpoint or handoff comment that states the current state, remaining work, and next concrete step
+  - verify the result
+  - add a completion comment
+  - `ptodo task update <TASK_ID> -s completed`
+- Before coding, move the chosen task to `in_progress`.
+- If work is paused, blocked, or handed off, leave a checkpoint or handoff comment that states the current state, what remains, and the next concrete step.
+- When the work is finished, add a completion comment, verify the result, and mark the task complete.
+- Do not treat a task as complete until its acceptance criteria are explicitly verified.
+- Do not skip tracker updates because the change feels small.
+- Do not invent a new task in code without recording it in Trekker first.
+
+## Mandatory Database Rules
+
+- Any database schema change requires explicit, task-specific user authorization before implementation.
+- Any `INSERT`, `UPDATE`, `UPSERT`, or `DELETE` query requires explicit, task-specific user authorization before implementation.
+- A Trekker task is not enough authorization for a database or SQL change.
+- SQL work should go through `sqlc`; do not add ad hoc handwritten SQL in Go when a scoped sqlc query would be the right solution.
+- If a database change is broader than the authorization given, stop and ask for the narrower approval before editing files.
+- Schema changes and SQL changes must propagate through every affected layer, including migrations, sqlc query files, regenerated Go code, storage, handlers, and docs.
+- Do not work around missing SQL authorization with brittle application-layer parsing or duplicate in-memory logic.
+
 ## Change Control
 
+- If the working tree is not clean, stop and ask before making further changes.
 - Keep work narrowly scoped to the explicitly requested task. Do not expand into adjacent changes unless the user asks for them.
+- Do not start work that was not directed by the user specifically.
+- Do not edit files outside the explicitly requested scope unless the user approves it.
 - Do not rename, move, or delete files outside the explicit request.
 - Inspect existing patterns before editing, and match local conventions instead of introducing new ones.
+- If a change affects tests or documentation, updating those tests and docs is a required part of the same change.
 - Prefer minimal diffs over cleanup or refactors, even when adjacent code looks tempting.
 - Run the smallest relevant test set for the touched area, and call out any test gaps if you cannot run them.
 - Ask before any dependency changes, network fetches, or tooling installs that could affect the workspace.
