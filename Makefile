@@ -17,7 +17,7 @@ K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
 GOMODCACHE ?= /tmp/phatodo-go-mod
 
-.PHONY: help build build-cli build-server install test test-cli test-server run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
+.PHONY: help build build-cli build-server install test test-cli test-server coverage run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
 
 help:
 	@echo "Targets:"
@@ -28,6 +28,7 @@ help:
 	@echo "  test          Run all Go tests"
 	@echo "  test-cli      Run CLI package tests"
 	@echo "  test-server   Run server package tests"
+	@echo "  coverage      Run per-file coverage thresholds"
 	@echo "  gofmt         Format all Go files"
 	@echo "  sqlc          Run sqlc generation"
 	@echo "  run-ptodo     Run the ptodo help"
@@ -62,6 +63,9 @@ test-cli:
 
 test-server:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./internal/server ./cmd/phatodo-server
+
+coverage:
+	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) scripts/coverage.py
 
 gofmt:
 	gofmt -w $$(rg --files -g '*.go')
