@@ -17,7 +17,7 @@ K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
 GOMODCACHE ?= /tmp/phatodo-go-mod
 
-.PHONY: help build build-cli build-server install test test-cli test-server coverage run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
+.PHONY: help build build-cli build-server install test test-cli test-server coverage guard-db-changes guard-db-authorization install-hooks run-ptodo run-server docker-build docker-push compose-up compose-down k3s-render deploy deploy-k3s gofmt sqlc clean
 
 help:
 	@echo "Targets:"
@@ -29,6 +29,9 @@ help:
 	@echo "  test-cli      Run CLI package tests"
 	@echo "  test-server   Run server package tests"
 	@echo "  coverage      Run per-file coverage thresholds"
+	@echo "  guard-db-changes        Block unapproved staged DB/SQL changes"
+	@echo "  guard-db-authorization  Require DB authorization trailer for DB/SQL commits"
+	@echo "  install-hooks           Install repository git hooks"
 	@echo "  gofmt         Format all Go files"
 	@echo "  sqlc          Run sqlc generation"
 	@echo "  run-ptodo     Run the ptodo help"
@@ -66,6 +69,17 @@ test-server:
 
 coverage:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) scripts/coverage.py
+
+guard-db-changes:
+	scripts/hooks/db-change-guard.sh pre-commit
+
+guard-db-authorization:
+	scripts/hooks/db-change-guard.sh commit-msg "$(COMMIT_MSG_FILE)"
+
+install-hooks:
+	install -d .git/hooks
+	install -m 0755 scripts/hooks/pre-commit .git/hooks/pre-commit
+	install -m 0755 scripts/hooks/commit-msg .git/hooks/commit-msg
 
 gofmt:
 	gofmt -w $$(rg --files -g '*.go')

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+cd "$ROOT"
+make guard-db-authorization COMMIT_MSG_FILE="$1"

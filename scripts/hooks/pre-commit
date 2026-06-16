@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# pre-commit: build + coverage gate for phatodo
+# Runs on every commit. --no-verify is prohibited by AGENTS.md.
+#
+# Checks in order:
+#   0. DB/SQL guard - block unapproved staged schema/query/storage changes
+#   1. Go build     - build CLI and server binaries
+#   2. Go tests     - run the standard Go test suite
+#   3. Coverage     - require per-file thresholds via make coverage
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+fail() { echo -e "${RED}FAIL${NC} $*" >&2; exit 1; }
+pass() { echo -e "${GREEN} OK ${NC} $*"; }
+info() { echo -e "${YELLOW}    ${NC} $*"; }
+
+cd "$ROOT"
+
+info "DB/SQL change guard..."
+if ! make guard-db-changes; then
+  fail "DB/SQL guard rejected staged changes"
+fi
+pass "DB/SQL change guard"
+
+info "Go build..."
+if ! make build; then
+  fail "make build failed"
+fi
+pass "Go build"
+
+info "Go tests..."
+if ! make test; then
+  fail "make test failed"
+fi
+pass "Go tests"
+
+info "Coverage thresholds..."
+if ! make coverage; then
+  fail "make coverage failed"
+fi
+pass "Coverage thresholds"
+
+echo ""
+echo -e "${GREEN}All checks passed.${NC}"
