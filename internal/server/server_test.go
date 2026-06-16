@@ -3,12 +3,14 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
+	"github.com/SuprPhatAnon/phatodo/internal/storage/postgres"
 	"github.com/stretchr/testify/require"
 )
 
@@ -249,6 +251,40 @@ func (f fakeAuthResolver) ResolveAPIPrincipal(_ context.Context, _ string, _ str
 	return f.user, f.err
 }
 
+type fakeEpicStore struct {
+	listResponse     domain.EpicListResponse
+	getResponse      domain.Epic
+	createResponse   domain.Epic
+	updateResponse   domain.Epic
+	completeResponse domain.Epic
+	deleteResponse   domain.Epic
+	err              error
+}
+
+func (f fakeEpicStore) ListEpics(_ context.Context, _ string, _ string, _ int) (domain.EpicListResponse, error) {
+	return f.listResponse, f.err
+}
+
+func (f fakeEpicStore) GetEpic(_ context.Context, _ string, _ string) (domain.Epic, error) {
+	return f.getResponse, f.err
+}
+
+func (f fakeEpicStore) CreateEpic(_ context.Context, _ string, _ domain.EpicCreateRequest, _ string) (domain.Epic, error) {
+	return f.createResponse, f.err
+}
+
+func (f fakeEpicStore) UpdateEpic(_ context.Context, _ string, _ string, _ domain.EpicUpdateRequest, _ string) (domain.Epic, error) {
+	return f.updateResponse, f.err
+}
+
+func (f fakeEpicStore) CompleteEpic(_ context.Context, _ string, _ string, _ string) (domain.Epic, error) {
+	return f.completeResponse, f.err
+}
+
+func (f fakeEpicStore) DeleteEpic(_ context.Context, _ string, _ string, _ string) (domain.Epic, error) {
+	return f.deleteResponse, f.err
+}
+
 type fakeTaskCreator struct {
 	createResponse domain.TaskCreateResponse
 	createErr      error
@@ -364,6 +400,25 @@ type fakeDependencyRemover struct {
 
 func (f fakeDependencyRemover) RemoveDependency(_ context.Context, _ string, _ string, _ string, _ string) (domain.Dependency, error) {
 	return f.removeResponse, f.removeErr
+}
+
+type fakeLockStore struct {
+	listResponse    domain.LockListResponse
+	acquireResponse domain.WorkItemLock
+	releaseResponse domain.WorkItemLock
+	err             error
+}
+
+func (f fakeLockStore) ListLocks(_ context.Context, _ string, _ []string, _ string, _ bool) (domain.LockListResponse, error) {
+	return f.listResponse, f.err
+}
+
+func (f fakeLockStore) AcquireLock(_ context.Context, _ string, _ domain.LockAcquireRequest, _ string) (domain.WorkItemLock, error) {
+	return f.acquireResponse, f.err
+}
+
+func (f fakeLockStore) ReleaseLock(_ context.Context, _ string, _ string, _ string) (domain.WorkItemLock, error) {
+	return f.releaseResponse, f.err
 }
 
 type fakeSearcher struct {
@@ -1037,4 +1092,365 @@ func TestReadyReturnsItems(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "CORE-5", blocked["id"])
 	require.Equal(t, "Backups", blocked["title"])
+}
+
+func TestNewBuildsHTTPServer(t *testing.T) {
+	server := New(Config{Addr: ":9090"})
+
+	require.Equal(t, ":9090", server.Addr)
+	require.NotNil(t, server.Handler)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	rec := httptest.NewRecorder()
+	server.Handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), `"database":"not_configured"`)
+}
+
+func TestAPIIndexDashboardAndProjectPlaceholderRoutes(t *testing.T) {
+	handler := newApp(Config{}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "phatodo API")
+
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "phatodo dashboard")
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/projects", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusNotImplemented, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), `"actor_id":"usr_1"`)
+}
+
+func TestEpicRoutesReturnItems(t *testing.T) {
+	store := fakeEpicStore{
+		listResponse: domain.EpicListResponse{
+			ProjectID: "project-1",
+			Items:     []domain.Epic{{ID: "EPIC-1", Title: "Track auth", Status: domain.StatusTodo, Priority: domain.PriorityHigh}},
+		},
+		getResponse:      domain.Epic{ID: "EPIC-1", Title: "Track auth", Status: domain.StatusTodo, Priority: domain.PriorityHigh},
+		createResponse:   domain.Epic{ID: "EPIC-2", Title: "Create auth", Status: domain.StatusTodo, Priority: domain.PriorityMedium},
+		updateResponse:   domain.Epic{ID: "EPIC-1", Title: "Track auth v2", Status: domain.StatusInProgress, Priority: domain.PriorityHigh},
+		completeResponse: domain.Epic{ID: "EPIC-1", Title: "Track auth", Status: domain.StatusCompleted, Priority: domain.PriorityHigh},
+		deleteResponse:   domain.Epic{ID: "EPIC-1", Title: "Track auth", Status: domain.StatusArchived, Priority: domain.PriorityHigh},
+	}
+	handler := newApp(Config{
+		EpicLister:    store,
+		EpicReader:    store,
+		EpicCreator:   store,
+		EpicUpdater:   store,
+		EpicCompleter: store,
+		EpicDeleter:   store,
+	}).routes()
+
+	cases := []struct {
+		method string
+		path   string
+		body   string
+		status int
+		want   string
+	}{
+		{http.MethodGet, "/api/v1/projects/project-1/epics?status=todo&limit=5", "", http.StatusOK, "EPIC-1"},
+		{http.MethodPost, "/api/v1/projects/project-1/epics", `{"title":"Create auth","priority":2}`, http.StatusCreated, "EPIC-2"},
+		{http.MethodGet, "/api/v1/projects/project-1/epics/EPIC-1", "", http.StatusOK, "Track auth"},
+		{http.MethodPatch, "/api/v1/projects/project-1/epics/EPIC-1", `{"title":"Track auth v2","status":"in_progress"}`, http.StatusOK, "Track auth v2"},
+		{http.MethodPost, "/api/v1/projects/project-1/epics/EPIC-1/complete", "", http.StatusOK, "completed"},
+		{http.MethodDelete, "/api/v1/projects/project-1/epics/EPIC-1", "", http.StatusOK, "archived"},
+	}
+
+	for _, tc := range cases {
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.Header.Set(AccessKeyHeader, "key")
+		req.Header.Set(AccessSecretHeader, "secret")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, tc.status, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Body.String(), tc.want)
+	}
+}
+
+func TestLockRoutesReturnLocks(t *testing.T) {
+	store := fakeLockStore{
+		listResponse: domain.LockListResponse{
+			ProjectID: "project-1",
+			Items: []domain.WorkItemLock{
+				{ID: "lock-1", EntityType: "task", EntityID: "TASK-1", LockedBy: "usr_1", Reason: "editing"},
+			},
+		},
+		acquireResponse: domain.WorkItemLock{ID: "lock-2", EntityType: "task", EntityID: "TASK-2", LockedBy: "usr_1", Reason: "editing"},
+		releaseResponse: domain.WorkItemLock{ID: "lock-2", EntityType: "task", EntityID: "TASK-2", LockedBy: "usr_1", Reason: "editing"},
+	}
+	handler := newApp(Config{LockLister: store, LockAcquirer: store, LockReleaser: store}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/locks?type=task,epic&entity=TASK-1&active=true", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "lock-1")
+
+	req = httptest.NewRequest(http.MethodPost, "/api/v1/projects/project-1/locks", strings.NewReader(`{"entity_type":"task","entity_id":"TASK-2","reason":"editing"}`))
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	req.Header.Set(UserIDHeader, "usr_1")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "lock-2")
+
+	req = httptest.NewRequest(http.MethodDelete, "/api/v1/projects/project-1/locks/lock-2", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "lock-2")
+}
+
+func TestLockListRejectsInvalidActiveQuery(t *testing.T) {
+	handler := newApp(Config{LockLister: fakeLockStore{}}).routes()
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/projects/project-1/locks?active=maybe", nil)
+	req.Header.Set(AccessKeyHeader, "key")
+	req.Header.Set(AccessSecretHeader, "secret")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.Contains(t, rec.Body.String(), "active must be true or false")
+}
+
+func TestStoreUnavailableRoutesReturnServiceUnavailable(t *testing.T) {
+	handler := newApp(Config{}).routes()
+	cases := []struct {
+		method string
+		path   string
+		body   string
+		want   string
+	}{
+		{http.MethodPost, "/api/v1/projects/project-1/epics", `{"title":"Epic"}`, "epic_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/epics/EPIC-1", "", "epic_store_unavailable"},
+		{http.MethodPatch, "/api/v1/projects/project-1/epics/EPIC-1", `{"title":"Epic"}`, "epic_store_unavailable"},
+		{http.MethodPost, "/api/v1/projects/project-1/epics/EPIC-1/complete", "", "epic_store_unavailable"},
+		{http.MethodDelete, "/api/v1/projects/project-1/epics/EPIC-1", "", "epic_store_unavailable"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks", `{"title":"Task","issue_prefix":"TASK"}`, "task_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1", "", "task_store_unavailable"},
+		{http.MethodPatch, "/api/v1/projects/project-1/tasks/TASK-1", `{"title":"Task"}`, "task_store_unavailable"},
+		{http.MethodDelete, "/api/v1/projects/project-1/tasks/TASK-1", "", "task_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1/subtasks", "", "task_store_unavailable"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/comments", `{"author":"codex","content":"hi"}`, "comment_store_unavailable"},
+		{http.MethodPatch, "/api/v1/projects/project-1/comments/cmt-1", `{"content":"hi"}`, "comment_store_unavailable"},
+		{http.MethodDelete, "/api/v1/projects/project-1/comments/cmt-1", "", "comment_store_unavailable"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", `{"depends_on_id":"TASK-0"}`, "dependency_store_unavailable"},
+		{http.MethodDelete, "/api/v1/projects/project-1/tasks/TASK-1/dependencies/TASK-0", "", "dependency_store_unavailable"},
+		{http.MethodPost, "/api/v1/projects/project-1/locks", `{"entity_type":"task","entity_id":"TASK-1"}`, "lock_store_unavailable"},
+		{http.MethodDelete, "/api/v1/projects/project-1/locks/lock-1", "", "lock_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/search?q=test", "", "search_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/history", "", "history_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/list", "", "list_store_unavailable"},
+		{http.MethodGet, "/api/v1/projects/project-1/ready", "", "ready_store_unavailable"},
+	}
+
+	for _, tc := range cases {
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.Header.Set(AccessKeyHeader, "key")
+		req.Header.Set(AccessSecretHeader, "secret")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusServiceUnavailable, rec.Code, tc.path+": "+rec.Body.String())
+		require.Contains(t, rec.Body.String(), tc.want)
+	}
+}
+
+func TestInvalidRequestRoutesReturnBadRequest(t *testing.T) {
+	handler := newApp(Config{
+		EpicCreator:     fakeEpicStore{},
+		EpicUpdater:     fakeEpicStore{},
+		TaskCreator:     fakeTaskCreator{},
+		TaskUpdater:     fakeTaskUpdater{},
+		CommentCreator:  fakeCommentCreator{},
+		CommentUpdater:  fakeCommentUpdater{},
+		DependencyAdder: fakeDependencyAdder{},
+		LockAcquirer:    fakeLockStore{},
+		Searcher:        fakeSearcher{},
+	}).routes()
+	cases := []struct {
+		method string
+		path   string
+		body   string
+		want   string
+	}{
+		{http.MethodPost, "/api/v1/projects/project-1/epics", `{}`, "title is required"},
+		{http.MethodPatch, "/api/v1/projects/project-1/epics/EPIC-1", `{"status":"bad"}`, "epic status must"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks", `{"title":"Task"}`, "issue_prefix is required"},
+		{http.MethodPatch, "/api/v1/projects/project-1/tasks/TASK-1", `{}`, "at least one field must be provided"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/comments", `{"author":"codex"}`, "content is required"},
+		{http.MethodPatch, "/api/v1/projects/project-1/comments/cmt-1", `{}`, "content is required"},
+		{http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", `{}`, "depends_on_id is required"},
+		{http.MethodPost, "/api/v1/projects/project-1/locks", `{"entity_type":"task"}`, "entity_id is required"},
+		{http.MethodGet, "/api/v1/projects/project-1/search", "", "search query is required"},
+	}
+
+	for _, tc := range cases {
+		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+		req.Header.Set(AccessKeyHeader, "key")
+		req.Header.Set(AccessSecretHeader, "secret")
+		rec := httptest.NewRecorder()
+
+		handler.ServeHTTP(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code, tc.path+": "+rec.Body.String())
+		require.Contains(t, rec.Body.String(), tc.want)
+	}
+}
+
+func TestKnownStoreErrorsMapToHTTPResponses(t *testing.T) {
+	cases := []struct {
+		name   string
+		config Config
+		method string
+		path   string
+		body   string
+		status int
+		want   string
+	}{
+		{"epic list project missing", Config{EpicLister: fakeEpicStore{err: postgres.ErrProjectNotFound}}, http.MethodGet, "/api/v1/projects/project-1/epics", "", http.StatusNotFound, "project_not_found"},
+		{"epic show missing", Config{EpicReader: fakeEpicStore{err: postgres.ErrEpicNotFound}}, http.MethodGet, "/api/v1/projects/project-1/epics/EPIC-1", "", http.StatusNotFound, "epic_not_found"},
+		{"task update evidence", Config{TaskUpdater: fakeTaskUpdater{updateErr: postgres.ErrTaskCompletionRequiresEvidence}}, http.MethodPatch, "/api/v1/projects/project-1/tasks/TASK-1", `{"status":"completed"}`, http.StatusBadRequest, "completion_evidence_required"},
+		{"dependency conflict", Config{DependencyAdder: fakeDependencyAdder{addErr: postgres.ErrDuplicateDependency}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", `{"depends_on_id":"TASK-0"}`, http.StatusConflict, "dependency_exists"},
+		{"lock conflict", Config{LockAcquirer: fakeLockStore{err: postgres.ErrLockConflict}}, http.MethodPost, "/api/v1/projects/project-1/locks", `{"entity_type":"task","entity_id":"TASK-1"}`, http.StatusConflict, "lock_conflict"},
+		{"admin exists", Config{BootstrapManager: fakeBootstrapManager{initErr: postgres.ErrAdminAlreadyExists}}, http.MethodPost, "/api/v1/admin/init", `{"username":"alice","password":"secret"}`, http.StatusConflict, "admin_already_exists"},
+		{"admin credentials", Config{BootstrapManager: fakeBootstrapManager{bootstrapErr: postgres.ErrInvalidAdminCredentials}}, http.MethodPost, "/api/v1/admin/bootstrap", `{"username":"alice","password":"secret","workspace_name":"ws","project_name":"project"}`, http.StatusUnauthorized, "invalid_credentials"},
+		{"config get missing", Config{ProjectConfigReader: fakeProjectConfigReader{err: postgres.ErrProjectConfigNotFound}}, http.MethodGet, "/api/v1/projects/project-1/config/theme", "", http.StatusNotFound, "project_config_not_found"},
+		{"config set project missing", Config{ProjectConfigWriter: fakeProjectConfigWriter{err: postgres.ErrProjectNotFound}}, http.MethodPut, "/api/v1/projects/project-1/config/theme", `{"value":"dark"}`, http.StatusNotFound, "project_not_found"},
+		{"task create invalid kind", Config{TaskCreator: fakeTaskCreator{createErr: postgres.ErrInvalidTaskKind}}, http.MethodPost, "/api/v1/projects/project-1/tasks", `{"title":"Task","issue_prefix":"TASK"}`, http.StatusBadRequest, "invalid_task_kind"},
+		{"subtask create task missing", Config{TaskCreator: fakeTaskCreator{createErr: postgres.ErrTaskNotFound}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/subtasks", `{"title":"Subtask"}`, http.StatusNotFound, "task_not_found"},
+		{"comment list task missing", Config{CommentLister: fakeCommentLister{listErr: postgres.ErrTaskNotFound}}, http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1/comments", "", http.StatusNotFound, "task_not_found"},
+		{"comment update missing", Config{CommentUpdater: fakeCommentUpdater{updateErr: postgres.ErrCommentNotFound}}, http.MethodPatch, "/api/v1/projects/project-1/comments/cmt-1", `{"content":"hi"}`, http.StatusNotFound, "comment_not_found"},
+		{"dependency cycle", Config{DependencyAdder: fakeDependencyAdder{addErr: postgres.ErrDependencyCycle}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", `{"depends_on_id":"TASK-0"}`, http.StatusBadRequest, "dependency_cycle"},
+		{"dependency remove missing", Config{DependencyRemover: fakeDependencyRemover{removeErr: postgres.ErrDependencyNotFound}}, http.MethodDelete, "/api/v1/projects/project-1/tasks/TASK-1/dependencies/TASK-0", "", http.StatusNotFound, "dependency_not_found"},
+		{"lock invalid type", Config{LockAcquirer: fakeLockStore{err: postgres.ErrInvalidLockEntityType}}, http.MethodPost, "/api/v1/projects/project-1/locks", `{"entity_type":"bad","entity_id":"TASK-1"}`, http.StatusBadRequest, "invalid_entity_type"},
+		{"lock release missing", Config{LockReleaser: fakeLockStore{err: postgres.ErrLockNotFound}}, http.MethodDelete, "/api/v1/projects/project-1/locks/lock-1", "", http.StatusNotFound, "lock_not_found"},
+		{"search project missing", Config{Searcher: fakeSearcher{searchErr: postgres.ErrProjectNotFound}}, http.MethodGet, "/api/v1/projects/project-1/search?q=test", "", http.StatusNotFound, "project_not_found"},
+		{"history project missing", Config{Historian: fakeHistorian{historyErr: postgres.ErrProjectNotFound}}, http.MethodGet, "/api/v1/projects/project-1/history", "", http.StatusNotFound, "project_not_found"},
+		{"list project missing", Config{ListLister: fakeListLister{listErr: postgres.ErrProjectNotFound}}, http.MethodGet, "/api/v1/projects/project-1/list", "", http.StatusNotFound, "project_not_found"},
+		{"ready project missing", Config{ReadyLister: fakeReadyLister{listErr: postgres.ErrProjectNotFound}}, http.MethodGet, "/api/v1/projects/project-1/ready", "", http.StatusNotFound, "project_not_found"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := newApp(tc.config).routes()
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set(AccessKeyHeader, "key")
+			req.Header.Set(AccessSecretHeader, "secret")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, tc.status, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), tc.want)
+		})
+	}
+}
+
+func TestStoreInternalErrorsReturnServerErrors(t *testing.T) {
+	boom := errors.New("boom")
+	cases := []struct {
+		name   string
+		config Config
+		method string
+		path   string
+		body   string
+		want   string
+	}{
+		{"config list", Config{ProjectConfigReader: fakeProjectConfigReader{err: boom}}, http.MethodGet, "/api/v1/projects/project-1/config", "", "project_config_list_failed"},
+		{"config get", Config{ProjectConfigReader: fakeProjectConfigReader{err: boom}}, http.MethodGet, "/api/v1/projects/project-1/config/theme", "", "project_config_get_failed"},
+		{"config set", Config{ProjectConfigWriter: fakeProjectConfigWriter{err: boom}}, http.MethodPut, "/api/v1/projects/project-1/config/theme", `{"value":"dark"}`, "project_config_set_failed"},
+		{"config unset", Config{ProjectConfigWriter: fakeProjectConfigWriter{err: boom}}, http.MethodDelete, "/api/v1/projects/project-1/config/theme", "", "project_config_unset_failed"},
+		{"epic list", Config{EpicLister: fakeEpicStore{err: boom}}, http.MethodGet, "/api/v1/projects/project-1/epics", "", "epic_list_failed"},
+		{"epic create", Config{EpicCreator: fakeEpicStore{err: boom}}, http.MethodPost, "/api/v1/projects/project-1/epics", `{"title":"Epic"}`, "epic_create_failed"},
+		{"epic show", Config{EpicReader: fakeEpicStore{err: boom}}, http.MethodGet, "/api/v1/projects/project-1/epics/EPIC-1", "", "epic_show_failed"},
+		{"epic update", Config{EpicUpdater: fakeEpicStore{err: boom}}, http.MethodPatch, "/api/v1/projects/project-1/epics/EPIC-1", `{"title":"Epic"}`, "epic_update_failed"},
+		{"epic complete", Config{EpicCompleter: fakeEpicStore{err: boom}}, http.MethodPost, "/api/v1/projects/project-1/epics/EPIC-1/complete", "", "epic_complete_failed"},
+		{"epic delete", Config{EpicDeleter: fakeEpicStore{err: boom}}, http.MethodDelete, "/api/v1/projects/project-1/epics/EPIC-1", "", "epic_delete_failed"},
+		{"task create", Config{TaskCreator: fakeTaskCreator{createErr: boom}}, http.MethodPost, "/api/v1/projects/project-1/tasks", `{"title":"Task","issue_prefix":"TASK"}`, "task_create_failed"},
+		{"subtask create", Config{TaskCreator: fakeTaskCreator{createErr: boom}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/subtasks", `{"title":"Task"}`, "subtask_create_failed"},
+		{"task show", Config{TaskReader: fakeTaskReader{getErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1", "", "task_show_failed"},
+		{"task list", Config{TaskLister: fakeTaskLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/tasks", "", "task_list_failed"},
+		{"subtask list", Config{SubtaskLister: fakeSubtaskLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1/subtasks", "", "subtask_list_failed"},
+		{"task update", Config{TaskUpdater: fakeTaskUpdater{updateErr: boom}}, http.MethodPatch, "/api/v1/projects/project-1/tasks/TASK-1", `{"title":"Task"}`, "task_update_failed"},
+		{"task delete", Config{TaskDeleter: fakeTaskDeleter{deleteErr: boom}}, http.MethodDelete, "/api/v1/projects/project-1/tasks/TASK-1", "", "task_delete_failed"},
+		{"comment list", Config{CommentLister: fakeCommentLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1/comments", "", "comment_list_failed"},
+		{"comment create", Config{CommentCreator: fakeCommentCreator{createErr: boom}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/comments", `{"author":"codex","content":"hi"}`, "comment_create_failed"},
+		{"comment update", Config{CommentUpdater: fakeCommentUpdater{updateErr: boom}}, http.MethodPatch, "/api/v1/projects/project-1/comments/cmt-1", `{"content":"hi"}`, "comment_update_failed"},
+		{"comment delete", Config{CommentDeleter: fakeCommentDeleter{deleteErr: boom}}, http.MethodDelete, "/api/v1/projects/project-1/comments/cmt-1", "", "comment_delete_failed"},
+		{"dependency list", Config{DependencyLister: fakeDependencyLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", "", "dependency_list_failed"},
+		{"dependency add", Config{DependencyAdder: fakeDependencyAdder{addErr: boom}}, http.MethodPost, "/api/v1/projects/project-1/tasks/TASK-1/dependencies", `{"depends_on_id":"TASK-0"}`, "dependency_add_failed"},
+		{"dependency remove", Config{DependencyRemover: fakeDependencyRemover{removeErr: boom}}, http.MethodDelete, "/api/v1/projects/project-1/tasks/TASK-1/dependencies/TASK-0", "", "dependency_remove_failed"},
+		{"lock list", Config{LockLister: fakeLockStore{err: boom}}, http.MethodGet, "/api/v1/projects/project-1/locks", "", "lock_list_failed"},
+		{"lock acquire", Config{LockAcquirer: fakeLockStore{err: boom}}, http.MethodPost, "/api/v1/projects/project-1/locks", `{"entity_type":"task","entity_id":"TASK-1"}`, "lock_acquire_failed"},
+		{"lock release", Config{LockReleaser: fakeLockStore{err: boom}}, http.MethodDelete, "/api/v1/projects/project-1/locks/lock-1", "", "lock_release_failed"},
+		{"search", Config{Searcher: fakeSearcher{searchErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/search?q=test", "", "search_failed"},
+		{"history", Config{Historian: fakeHistorian{historyErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/history", "", "history_failed"},
+		{"list", Config{ListLister: fakeListLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/list", "", "list_failed"},
+		{"ready", Config{ReadyLister: fakeReadyLister{listErr: boom}}, http.MethodGet, "/api/v1/projects/project-1/ready", "", "ready_list_failed"},
+		{"admin init", Config{BootstrapManager: fakeBootstrapManager{initErr: boom}}, http.MethodPost, "/api/v1/admin/init", `{"username":"alice","password":"secret"}`, "admin_init_failed"},
+		{"admin bootstrap", Config{BootstrapManager: fakeBootstrapManager{bootstrapErr: boom}}, http.MethodPost, "/api/v1/admin/bootstrap", `{"username":"alice","password":"secret","workspace_name":"ws","project_name":"project"}`, "admin_bootstrap_failed"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := newApp(tc.config).routes()
+			req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
+			req.Header.Set(AccessKeyHeader, "key")
+			req.Header.Set(AccessSecretHeader, "secret")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusInternalServerError, rec.Code, rec.Body.String())
+			require.Contains(t, rec.Body.String(), tc.want)
+		})
+	}
+}
+
+func TestDecodeHelpersRejectMalformedAndMissingFields(t *testing.T) {
+	_, err := decodeAdminInitRequest(strings.NewReader(`{"password":"secret"}`))
+	require.Error(t, err)
+	_, err = decodeAdminBootstrapRequest(strings.NewReader(`{"username":"alice","password":"secret"}`))
+	require.Error(t, err)
+	_, err = decodeEpicUpdateRequest(strings.NewReader(`{}`))
+	require.Error(t, err)
+	_, err = decodeProjectConfigSetRequest(strings.NewReader(`{bad-json`))
+	require.Error(t, err)
+	_, err = decodeTaskCreateRequest(strings.NewReader(`{"title":"Task","issue_prefix":"TASK","kind":"story"}`))
+	require.Error(t, err)
+	_, err = decodeSubtaskCreateRequest(strings.NewReader(`{"title":"Subtask","kind":"story"}`))
+	require.Error(t, err)
+	_, err = decodeCommentCreateRequest(strings.NewReader(`{"author":"codex","content":"hi","kind":"note"}`))
+	require.Error(t, err)
+	req, err := decodeLockAcquireRequest(strings.NewReader(`{"entity_type":"task","entity_id":"TASK-1"}`))
+	require.NoError(t, err)
+	require.Equal(t, "1h", req.TTL)
+	require.False(t, isAllowedTaskKind("story"))
+	require.False(t, isAllowedTaskStatus("blocked"))
+	require.False(t, isAllowedEpicStatus("blocked"))
 }
