@@ -859,7 +859,12 @@ func TestRunQuickstart(t *testing.T) {
 	require.Contains(t, stdout.String(), "ptodo --toon ready")
 	require.Contains(t, stdout.String(), "Good usage:")
 	require.Contains(t, stdout.String(), "Bad usage:")
+	require.Contains(t, stdout.String(), "planned_files")
+	require.Contains(t, stdout.String(), "changed_files")
+	require.Contains(t, stdout.String(), "--changed-files-json")
 	require.Contains(t, stdout.String(), `ptodo task update ABC-1 --criteria-json '["docs written","tests passing"]'`)
+	require.Contains(t, stdout.String(), "Complete tasks with `ptodo task update <task-id> -s completed")
+	require.NotContains(t, stdout.String(), "ptodo task complete")
 }
 
 func TestRunQuickstartHelp(t *testing.T) {

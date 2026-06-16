@@ -7,7 +7,7 @@ This document collects the repo-level rules that are most useful while working i
 - Start from `ptodo --toon ready` or `ptodo --toon list` before picking up work.
 - Move the chosen task to `in_progress` before coding.
 - Leave a checkpoint or handoff comment whenever work is paused or interrupted.
-- Mark the task complete only after the work is implemented, validated, and documented.
+- Complete tasks with `ptodo task update <task-id> -s completed --summary "..." --changed-files-json '["file.go"]' --evidence-json '["verification"]'` only after the work is implemented, validated, and documented.
 
 ## Task Hygiene
 

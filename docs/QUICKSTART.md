@@ -94,7 +94,7 @@ Epics: todo, in_progress, completed, archived
 2. Update the task to `in_progress`.
 3. Work the task and leave checkpoint comments if context changes.
 4. Add a summary comment before completion.
-5. Mark the task completed.
+5. Complete tasks with `ptodo task update <task-id> -s completed --summary "..." --changed-files-json '["file.go"]' --evidence-json '["verification"]'`.
 
 ## Before Context Reset
 ptodo comment add <task-id> -a "agent" -c "Checkpoint: done A,B. Next: C. Files: x.ts, y.ts"
