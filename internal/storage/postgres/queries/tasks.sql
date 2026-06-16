@@ -51,7 +51,7 @@ INSERT INTO tasks (
 RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis, planned_files;
 
 -- name: ListTasks :many
-SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND parent_task_id IS NULL
@@ -60,7 +60,7 @@ WHERE project_id = sqlc.arg(project_id)
 ORDER BY priority ASC, created_at ASC, id ASC;
 
 -- name: ListSubtasks :many
-SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND parent_task_id = sqlc.arg(parent_task_id)
@@ -115,7 +115,7 @@ RETURNING id, workspace_id, project_id, epic_id, parent_task_id, kind, root_caus
 	completed_at, created_at, updated_at;
 
 -- name: ListReadyTasks :many
-SELECT id, title, description, status, priority, epic_id, parent_task_id, tags
+SELECT id, title, description, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files
 FROM tasks t
 WHERE t.project_id = sqlc.arg(project_id)
   AND t.parent_task_id IS NULL
@@ -132,7 +132,7 @@ WHERE t.project_id = sqlc.arg(project_id)
 ORDER BY t.priority ASC, t.created_at ASC, t.id ASC;
 
 -- name: ListReadyDependents :many
-SELECT d.depends_on_id, t.id, t.title, t.status, t.priority, t.epic_id, t.parent_task_id, t.tags
+SELECT d.depends_on_id, t.id, t.title, t.status, t.priority, t.kind, t.root_cause_analysis, t.epic_id, t.parent_task_id, t.tags, t.planned_files, t.changed_files
 FROM dependencies d
 JOIN tasks t ON t.project_id = d.project_id AND t.id = d.task_id
 WHERE d.project_id = sqlc.arg(project_id)

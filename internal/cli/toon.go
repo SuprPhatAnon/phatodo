@@ -167,6 +167,9 @@ func writeTaskListItem(w io.Writer, indent int, item domain.TaskListItem) {
 	if item.Kind != "" {
 		writeTOONField(w, indent+1, "kind", string(item.Kind))
 	}
+	if item.RootCauseAnalysis != "" {
+		writeTOONField(w, indent+1, "rootCauseAnalysis", item.RootCauseAnalysis)
+	}
 	writeTOONField(w, indent+1, "description", item.Description)
 	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
 	writeTOONField(w, indent+1, "status", string(item.Status))
@@ -178,6 +181,12 @@ func writeTaskListItem(w io.Writer, indent int, item domain.TaskListItem) {
 	}
 	if len(item.Tags) > 0 {
 		writeTOONQuotedField(w, indent+1, "tags", strings.Join(item.Tags, ","))
+	}
+	if len(item.PlannedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "plannedFiles", item.PlannedFiles)
+	}
+	if len(item.ChangedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "changedFiles", item.ChangedFiles)
 	}
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
 	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
@@ -186,6 +195,12 @@ func writeTaskListItem(w io.Writer, indent int, item domain.TaskListItem) {
 func writeReadyListItem(w io.Writer, indent int, item domain.ReadyListItem) {
 	writeTOONListItemStart(w, indent, "id", item.ID)
 	writeTOONField(w, indent+1, "title", item.Title)
+	if item.Kind != "" {
+		writeTOONField(w, indent+1, "kind", string(item.Kind))
+	}
+	if item.RootCauseAnalysis != "" {
+		writeTOONField(w, indent+1, "rootCauseAnalysis", item.RootCauseAnalysis)
+	}
 	writeTOONField(w, indent+1, "description", item.Description)
 	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
 	writeTOONField(w, indent+1, "status", string(item.Status))
@@ -197,6 +212,12 @@ func writeReadyListItem(w io.Writer, indent int, item domain.ReadyListItem) {
 	}
 	if len(item.Tags) > 0 {
 		writeTOONQuotedField(w, indent+1, "tags", strings.Join(item.Tags, ","))
+	}
+	if len(item.PlannedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "plannedFiles", item.PlannedFiles)
+	}
+	if len(item.ChangedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "changedFiles", item.ChangedFiles)
 	}
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
 	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)
@@ -406,6 +427,12 @@ func writeUnifiedListItem(w io.Writer, indent int, item domain.UnifiedListItem) 
 	writeTOONListItemStart(w, indent, "id", item.ID)
 	writeTOONField(w, indent+1, "entityType", item.EntityType)
 	writeTOONField(w, indent+1, "title", item.Title)
+	if item.Kind != "" {
+		writeTOONField(w, indent+1, "kind", string(item.Kind))
+	}
+	if item.RootCauseAnalysis != "" {
+		writeTOONField(w, indent+1, "rootCauseAnalysis", item.RootCauseAnalysis)
+	}
 	writeTOONField(w, indent+1, "description", item.Description)
 	if item.Status != "" {
 		writeTOONField(w, indent+1, "status", string(item.Status))
@@ -419,6 +446,12 @@ func writeUnifiedListItem(w io.Writer, indent int, item domain.UnifiedListItem) 
 	}
 	if len(item.Tags) > 0 {
 		writeTOONQuotedField(w, indent+1, "tags", strings.Join(item.Tags, ","))
+	}
+	if len(item.PlannedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "plannedFiles", item.PlannedFiles)
+	}
+	if len(item.ChangedFiles) > 0 {
+		writeTOONStringArray(w, indent+1, "changedFiles", item.ChangedFiles)
 	}
 	writeTOONTimeField(w, indent+1, "createdAt", item.CreatedAt)
 	writeTOONTimeField(w, indent+1, "updatedAt", item.UpdatedAt)

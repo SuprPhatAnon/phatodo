@@ -92,17 +92,20 @@ type TaskCreateResponse struct {
 }
 
 type TaskListItem struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Kind         TaskKind  `json:"kind,omitempty"`
-	Description  string    `json:"description,omitempty"`
-	Status       Status    `json:"status"`
-	Priority     Priority  `json:"priority"`
-	EpicID       string    `json:"epic_id,omitempty"`
-	ParentTaskID string    `json:"parent_task_id,omitempty"`
-	Tags         []string  `json:"tags,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Kind              TaskKind  `json:"kind,omitempty"`
+	RootCauseAnalysis string    `json:"root_cause_analysis,omitempty"`
+	Description       string    `json:"description,omitempty"`
+	Status            Status    `json:"status"`
+	Priority          Priority  `json:"priority"`
+	EpicID            string    `json:"epic_id,omitempty"`
+	ParentTaskID      string    `json:"parent_task_id,omitempty"`
+	Tags              []string  `json:"tags,omitempty"`
+	PlannedFiles      []string  `json:"planned_files,omitempty"`
+	ChangedFiles      []string  `json:"changed_files,omitempty"`
+	CreatedAt         time.Time `json:"created_at,omitempty"`
+	UpdatedAt         time.Time `json:"updated_at,omitempty"`
 }
 
 type TaskListResponse struct {
@@ -165,17 +168,21 @@ const (
 )
 
 type ReadyListItem struct {
-	ID           string         `json:"id"`
-	Title        string         `json:"title"`
-	Description  string         `json:"description,omitempty"`
-	Status       Status         `json:"status"`
-	Priority     Priority       `json:"priority"`
-	EpicID       string         `json:"epic_id,omitempty"`
-	ParentTaskID string         `json:"parent_task_id,omitempty"`
-	Tags         []string       `json:"tags,omitempty"`
-	Unblocks     []TaskListItem `json:"unblocks,omitempty"`
-	CreatedAt    time.Time      `json:"created_at,omitempty"`
-	UpdatedAt    time.Time      `json:"updated_at,omitempty"`
+	ID                string         `json:"id"`
+	Title             string         `json:"title"`
+	Kind              TaskKind       `json:"kind,omitempty"`
+	RootCauseAnalysis string         `json:"root_cause_analysis,omitempty"`
+	Description       string         `json:"description,omitempty"`
+	Status            Status         `json:"status"`
+	Priority          Priority       `json:"priority"`
+	EpicID            string         `json:"epic_id,omitempty"`
+	ParentTaskID      string         `json:"parent_task_id,omitempty"`
+	Tags              []string       `json:"tags,omitempty"`
+	PlannedFiles      []string       `json:"planned_files,omitempty"`
+	ChangedFiles      []string       `json:"changed_files,omitempty"`
+	Unblocks          []TaskListItem `json:"unblocks,omitempty"`
+	CreatedAt         time.Time      `json:"created_at,omitempty"`
+	UpdatedAt         time.Time      `json:"updated_at,omitempty"`
 }
 
 type ReadyListResponse struct {
@@ -298,19 +305,20 @@ type LockListResponse struct {
 }
 
 type SearchItem struct {
-	EntityType   string    `json:"entity_type"`
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description,omitempty"`
-	Content      string    `json:"content,omitempty"`
-	Status       Status    `json:"status,omitempty"`
-	Priority     Priority  `json:"priority,omitempty"`
-	EpicID       string    `json:"epic_id,omitempty"`
-	ParentTaskID string    `json:"parent_task_id,omitempty"`
-	Author       string    `json:"author,omitempty"`
-	Kind         string    `json:"kind,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	EntityType        string    `json:"entity_type"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	RootCauseAnalysis string    `json:"root_cause_analysis,omitempty"`
+	Description       string    `json:"description,omitempty"`
+	Content           string    `json:"content,omitempty"`
+	Status            Status    `json:"status,omitempty"`
+	Priority          Priority  `json:"priority,omitempty"`
+	EpicID            string    `json:"epic_id,omitempty"`
+	ParentTaskID      string    `json:"parent_task_id,omitempty"`
+	Author            string    `json:"author,omitempty"`
+	Kind              string    `json:"kind,omitempty"`
+	CreatedAt         time.Time `json:"created_at,omitempty"`
+	UpdatedAt         time.Time `json:"updated_at,omitempty"`
 }
 
 type SearchResponse struct {
@@ -320,17 +328,21 @@ type SearchResponse struct {
 }
 
 type UnifiedListItem struct {
-	EntityType   string    `json:"entity_type"`
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description,omitempty"`
-	Status       Status    `json:"status,omitempty"`
-	Priority     Priority  `json:"priority,omitempty"`
-	EpicID       string    `json:"epic_id,omitempty"`
-	ParentTaskID string    `json:"parent_task_id,omitempty"`
-	Tags         []string  `json:"tags,omitempty"`
-	CreatedAt    time.Time `json:"created_at,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at,omitempty"`
+	EntityType        string    `json:"entity_type"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Kind              TaskKind  `json:"kind,omitempty"`
+	RootCauseAnalysis string    `json:"root_cause_analysis,omitempty"`
+	Description       string    `json:"description,omitempty"`
+	Status            Status    `json:"status,omitempty"`
+	Priority          Priority  `json:"priority,omitempty"`
+	EpicID            string    `json:"epic_id,omitempty"`
+	ParentTaskID      string    `json:"parent_task_id,omitempty"`
+	Tags              []string  `json:"tags,omitempty"`
+	PlannedFiles      []string  `json:"planned_files,omitempty"`
+	ChangedFiles      []string  `json:"changed_files,omitempty"`
+	CreatedAt         time.Time `json:"created_at,omitempty"`
+	UpdatedAt         time.Time `json:"updated_at,omitempty"`
 }
 
 type ListResponse struct {

@@ -266,6 +266,9 @@ func taskListItemFromSQLC(row db.ListTasksRow) domain.TaskListItem {
 		UpdatedAt: row.UpdatedAt,
 	}
 	item.Kind = domain.TaskKind(row.Kind)
+	item.RootCauseAnalysis = row.RootCauseAnalysis
+	decodeStringArray(row.PlannedFiles, &item.PlannedFiles)
+	decodeStringArray(row.ChangedFiles, &item.ChangedFiles)
 	if row.EpicID != nil {
 		item.EpicID = *row.EpicID
 	}
@@ -281,8 +284,12 @@ func readyListItemFromSQLC(row db.ListReadyTasksRow) domain.ReadyListItem {
 		Title:    row.Title,
 		Status:   domain.Status(row.Status),
 		Priority: domain.Priority(row.Priority),
+		Kind:     domain.TaskKind(row.Kind),
 		Tags:     row.Tags,
 	}
+	item.RootCauseAnalysis = row.RootCauseAnalysis
+	decodeStringArray(row.PlannedFiles, &item.PlannedFiles)
+	decodeStringArray(row.ChangedFiles, &item.ChangedFiles)
 	if row.Description != nil {
 		item.Description = *row.Description
 	}
@@ -301,8 +308,12 @@ func readyDependentFromSQLC(row db.ListReadyDependentsRow) domain.TaskListItem {
 		Title:    row.Title,
 		Status:   domain.Status(row.Status),
 		Priority: domain.Priority(row.Priority),
+		Kind:     domain.TaskKind(row.Kind),
 		Tags:     row.Tags,
 	}
+	item.RootCauseAnalysis = row.RootCauseAnalysis
+	decodeStringArray(row.PlannedFiles, &item.PlannedFiles)
+	decodeStringArray(row.ChangedFiles, &item.ChangedFiles)
 	if row.EpicID != nil {
 		item.EpicID = *row.EpicID
 	}
@@ -333,10 +344,14 @@ func unifiedItemFromTaskSQLC(row db.ListTasksUnifiedRow) domain.UnifiedListItem 
 		Description: row.Description,
 		Status:      domain.Status(row.Status),
 		Priority:    domain.Priority(row.Priority),
+		Kind:        domain.TaskKind(row.Kind),
 		Tags:        row.Tags,
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
 	}
+	item.RootCauseAnalysis = row.RootCauseAnalysis
+	decodeStringArray(row.PlannedFiles, &item.PlannedFiles)
+	decodeStringArray(row.ChangedFiles, &item.ChangedFiles)
 	if row.EpicID != nil {
 		item.EpicID = *row.EpicID
 	}
@@ -457,6 +472,13 @@ func derefString(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func decodeStringArray(data []byte, target *[]string) {
+	if len(data) == 0 {
+		return
+	}
+	_ = json.Unmarshal(data, target)
 }
 
 func epicFromSQLC(row db.Epic) (domain.Epic, error) {

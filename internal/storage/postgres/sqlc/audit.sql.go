@@ -170,7 +170,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 }
 
 const listTasksUnified = `-- name: ListTasksUnified :many
-SELECT id, title, COALESCE(description, ''), status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, COALESCE(description, ''), status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND ($2 = '' OR status = $2)
@@ -183,17 +183,20 @@ type ListTasksUnifiedParams struct {
 }
 
 type ListTasksUnifiedRow struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	Status       string    `json:"status"`
-	Priority     int32     `json:"priority"`
-	Kind         string    `json:"kind"`
-	EpicID       *string   `json:"epic_id"`
-	ParentTaskID *string   `json:"parent_task_id"`
-	Tags         []string  `json:"tags"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Description       string    `json:"description"`
+	Status            string    `json:"status"`
+	Priority          int32     `json:"priority"`
+	Kind              string    `json:"kind"`
+	RootCauseAnalysis string    `json:"root_cause_analysis"`
+	EpicID            *string   `json:"epic_id"`
+	ParentTaskID      *string   `json:"parent_task_id"`
+	Tags              []string  `json:"tags"`
+	PlannedFiles      []byte    `json:"planned_files"`
+	ChangedFiles      []byte    `json:"changed_files"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListTasksUnified(ctx context.Context, arg ListTasksUnifiedParams) ([]ListTasksUnifiedRow, error) {
@@ -212,9 +215,12 @@ func (q *Queries) ListTasksUnified(ctx context.Context, arg ListTasksUnifiedPara
 			&i.Status,
 			&i.Priority,
 			&i.Kind,
+			&i.RootCauseAnalysis,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
+			&i.PlannedFiles,
+			&i.ChangedFiles,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

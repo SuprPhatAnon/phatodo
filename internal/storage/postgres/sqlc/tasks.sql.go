@@ -308,7 +308,7 @@ func (q *Queries) GetUserID(ctx context.Context, userID string) (string, error) 
 }
 
 const listReadyDependents = `-- name: ListReadyDependents :many
-SELECT d.depends_on_id, t.id, t.title, t.status, t.priority, t.epic_id, t.parent_task_id, t.tags
+SELECT d.depends_on_id, t.id, t.title, t.status, t.priority, t.kind, t.root_cause_analysis, t.epic_id, t.parent_task_id, t.tags, t.planned_files, t.changed_files
 FROM dependencies d
 JOIN tasks t ON t.project_id = d.project_id AND t.id = d.task_id
 WHERE d.project_id = $1
@@ -334,14 +334,18 @@ type ListReadyDependentsParams struct {
 }
 
 type ListReadyDependentsRow struct {
-	DependsOnID  string   `json:"depends_on_id"`
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Status       string   `json:"status"`
-	Priority     int32    `json:"priority"`
-	EpicID       *string  `json:"epic_id"`
-	ParentTaskID *string  `json:"parent_task_id"`
-	Tags         []string `json:"tags"`
+	DependsOnID       string   `json:"depends_on_id"`
+	ID                string   `json:"id"`
+	Title             string   `json:"title"`
+	Status            string   `json:"status"`
+	Priority          int32    `json:"priority"`
+	Kind              string   `json:"kind"`
+	RootCauseAnalysis string   `json:"root_cause_analysis"`
+	EpicID            *string  `json:"epic_id"`
+	ParentTaskID      *string  `json:"parent_task_id"`
+	Tags              []string `json:"tags"`
+	PlannedFiles      []byte   `json:"planned_files"`
+	ChangedFiles      []byte   `json:"changed_files"`
 }
 
 func (q *Queries) ListReadyDependents(ctx context.Context, arg ListReadyDependentsParams) ([]ListReadyDependentsRow, error) {
@@ -359,9 +363,13 @@ func (q *Queries) ListReadyDependents(ctx context.Context, arg ListReadyDependen
 			&i.Title,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
+			&i.RootCauseAnalysis,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
+			&i.PlannedFiles,
+			&i.ChangedFiles,
 		); err != nil {
 			return nil, err
 		}
@@ -374,7 +382,7 @@ func (q *Queries) ListReadyDependents(ctx context.Context, arg ListReadyDependen
 }
 
 const listReadyTasks = `-- name: ListReadyTasks :many
-SELECT id, title, description, status, priority, epic_id, parent_task_id, tags
+SELECT id, title, description, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files
 FROM tasks t
 WHERE t.project_id = $1
   AND t.parent_task_id IS NULL
@@ -397,14 +405,18 @@ type ListReadyTasksParams struct {
 }
 
 type ListReadyTasksRow struct {
-	ID           string   `json:"id"`
-	Title        string   `json:"title"`
-	Description  *string  `json:"description"`
-	Status       string   `json:"status"`
-	Priority     int32    `json:"priority"`
-	EpicID       *string  `json:"epic_id"`
-	ParentTaskID *string  `json:"parent_task_id"`
-	Tags         []string `json:"tags"`
+	ID                string   `json:"id"`
+	Title             string   `json:"title"`
+	Description       *string  `json:"description"`
+	Status            string   `json:"status"`
+	Priority          int32    `json:"priority"`
+	Kind              string   `json:"kind"`
+	RootCauseAnalysis string   `json:"root_cause_analysis"`
+	EpicID            *string  `json:"epic_id"`
+	ParentTaskID      *string  `json:"parent_task_id"`
+	Tags              []string `json:"tags"`
+	PlannedFiles      []byte   `json:"planned_files"`
+	ChangedFiles      []byte   `json:"changed_files"`
 }
 
 func (q *Queries) ListReadyTasks(ctx context.Context, arg ListReadyTasksParams) ([]ListReadyTasksRow, error) {
@@ -422,9 +434,13 @@ func (q *Queries) ListReadyTasks(ctx context.Context, arg ListReadyTasksParams) 
 			&i.Description,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
+			&i.RootCauseAnalysis,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
+			&i.PlannedFiles,
+			&i.ChangedFiles,
 		); err != nil {
 			return nil, err
 		}
@@ -437,7 +453,7 @@ func (q *Queries) ListReadyTasks(ctx context.Context, arg ListReadyTasksParams) 
 }
 
 const listSubtasks = `-- name: ListSubtasks :many
-SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND parent_task_id = $2
@@ -452,16 +468,19 @@ type ListSubtasksParams struct {
 }
 
 type ListSubtasksRow struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Status       string    `json:"status"`
-	Priority     int32     `json:"priority"`
-	Kind         string    `json:"kind"`
-	EpicID       *string   `json:"epic_id"`
-	ParentTaskID *string   `json:"parent_task_id"`
-	Tags         []string  `json:"tags"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Status            string    `json:"status"`
+	Priority          int32     `json:"priority"`
+	Kind              string    `json:"kind"`
+	RootCauseAnalysis string    `json:"root_cause_analysis"`
+	EpicID            *string   `json:"epic_id"`
+	ParentTaskID      *string   `json:"parent_task_id"`
+	Tags              []string  `json:"tags"`
+	PlannedFiles      []byte    `json:"planned_files"`
+	ChangedFiles      []byte    `json:"changed_files"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListSubtasks(ctx context.Context, arg ListSubtasksParams) ([]ListSubtasksRow, error) {
@@ -479,9 +498,12 @@ func (q *Queries) ListSubtasks(ctx context.Context, arg ListSubtasksParams) ([]L
 			&i.Status,
 			&i.Priority,
 			&i.Kind,
+			&i.RootCauseAnalysis,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
+			&i.PlannedFiles,
+			&i.ChangedFiles,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -496,7 +518,7 @@ func (q *Queries) ListSubtasks(ctx context.Context, arg ListSubtasksParams) ([]L
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, root_cause_analysis, epic_id, parent_task_id, tags, planned_files, changed_files, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND parent_task_id IS NULL
@@ -512,16 +534,19 @@ type ListTasksParams struct {
 }
 
 type ListTasksRow struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Status       string    `json:"status"`
-	Priority     int32     `json:"priority"`
-	Kind         string    `json:"kind"`
-	EpicID       *string   `json:"epic_id"`
-	ParentTaskID *string   `json:"parent_task_id"`
-	Tags         []string  `json:"tags"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	Title             string    `json:"title"`
+	Status            string    `json:"status"`
+	Priority          int32     `json:"priority"`
+	Kind              string    `json:"kind"`
+	RootCauseAnalysis string    `json:"root_cause_analysis"`
+	EpicID            *string   `json:"epic_id"`
+	ParentTaskID      *string   `json:"parent_task_id"`
+	Tags              []string  `json:"tags"`
+	PlannedFiles      []byte    `json:"planned_files"`
+	ChangedFiles      []byte    `json:"changed_files"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error) {
@@ -539,9 +564,12 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.Status,
 			&i.Priority,
 			&i.Kind,
+			&i.RootCauseAnalysis,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
+			&i.PlannedFiles,
+			&i.ChangedFiles,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

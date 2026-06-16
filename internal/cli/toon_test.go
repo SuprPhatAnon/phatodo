@@ -70,15 +70,22 @@ func TestWriteTaskListItemTOON(t *testing.T) {
 	var buf bytes.Buffer
 
 	writeTaskListItem(&buf, 0, domain.TaskListItem{
-		ID:       "ABC-1",
-		Title:    "Write docs",
-		Status:   domain.StatusInProgress,
-		Priority: domain.PriorityMedium,
-		EpicID:   "epic-1",
-		Tags:     []string{"infra", "api"},
+		ID:                "ABC-1",
+		Title:             "Write docs",
+		Kind:              domain.TaskKindBug,
+		RootCauseAnalysis: "missing trace",
+		Status:            domain.StatusInProgress,
+		Priority:          domain.PriorityMedium,
+		EpicID:            "epic-1",
+		Tags:              []string{"infra", "api"},
+		PlannedFiles:      []string{"internal/cli/toon.go"},
+		ChangedFiles:      []string{"internal/cli/toon_test.go"},
 	})
 
-	require.Equal(t, "- id: ABC-1\n  title: \"Write docs\"\n  description: \"\"\n  priority: 2\n  status: in_progress\n  epicId: epic-1\n  tags: \"infra,api\"\n", buf.String())
+	require.Contains(t, buf.String(), "kind: bug\n")
+	require.Contains(t, buf.String(), "rootCauseAnalysis: \"missing trace\"\n")
+	require.Contains(t, buf.String(), "plannedFiles[1]:\n")
+	require.Contains(t, buf.String(), "changedFiles[1]:\n")
 }
 
 func TestWriteReadyListItemTOON(t *testing.T) {
@@ -87,17 +94,20 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 	var buf bytes.Buffer
 
 	writeReadyListItem(&buf, 0, domain.ReadyListItem{
-		ID:          "CORE-1",
-		Title:       "Health endpoints",
-		Description: "Add readiness and liveness checks",
-		Status:      domain.StatusTodo,
-		Priority:    domain.PriorityHigh,
-		EpicID:      "epic-1",
-		Tags:        []string{"infra", "api"},
+		ID:           "CORE-1",
+		Title:        "Health endpoints",
+		Kind:         domain.TaskKindFeature,
+		Description:  "Add readiness and liveness checks",
+		Status:       domain.StatusTodo,
+		Priority:     domain.PriorityHigh,
+		EpicID:       "epic-1",
+		Tags:         []string{"infra", "api"},
+		PlannedFiles: []string{"internal/server/handlers.go"},
 		Unblocks: []domain.TaskListItem{
 			{
 				ID:       "CORE-5",
 				Title:    "Backups",
+				Kind:     domain.TaskKindTask,
 				Status:   domain.StatusTodo,
 				Priority: domain.PriorityHigh,
 				EpicID:   "epic-1",
@@ -107,8 +117,34 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 	})
 
 	require.Contains(t, buf.String(), "description: \"Add readiness and liveness checks\"")
+	require.Contains(t, buf.String(), "kind: feature\n")
+	require.Contains(t, buf.String(), "plannedFiles[1]:\n")
 	require.Contains(t, buf.String(), "dependents[1]{id,title,status,priority}:\n")
 	require.Contains(t, buf.String(), "    - CORE-5,Backups,todo,1\n")
+}
+
+func TestWriteUnifiedListItemTOONIncludesTaskMetadata(t *testing.T) {
+	setOutputMode(true)
+	t.Cleanup(func() { setOutputMode(false) })
+	var buf bytes.Buffer
+
+	writeUnifiedListItem(&buf, 0, domain.UnifiedListItem{
+		EntityType:        "task",
+		ID:                "ABC-1",
+		Title:             "Write docs",
+		Kind:              domain.TaskKindBug,
+		RootCauseAnalysis: "missing trace",
+		Description:       "Docs need updates",
+		Status:            domain.StatusCompleted,
+		Priority:          domain.PriorityMedium,
+		PlannedFiles:      []string{"docs/QUICKSTART.md"},
+		ChangedFiles:      []string{"docs/CLI_OUTPUT.md"},
+	})
+
+	require.Contains(t, buf.String(), "kind: bug\n")
+	require.Contains(t, buf.String(), "rootCauseAnalysis: \"missing trace\"\n")
+	require.Contains(t, buf.String(), "plannedFiles[1]:\n")
+	require.Contains(t, buf.String(), "changedFiles[1]:\n")
 }
 
 func TestWriteCommentTOON(t *testing.T) {
