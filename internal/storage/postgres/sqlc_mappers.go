@@ -84,6 +84,9 @@ func readyListItemFromSQLC(row db.ListReadyTasksRow) domain.ReadyListItem {
 		Priority: domain.Priority(row.Priority),
 		Tags:     row.Tags,
 	}
+	if row.Description != nil {
+		item.Description = *row.Description
+	}
 	if row.EpicID != nil {
 		item.EpicID = *row.EpicID
 	}

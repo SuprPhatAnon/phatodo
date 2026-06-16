@@ -505,12 +505,13 @@ func TestRunReadyCallsServer(t *testing.T) {
 					ProjectID: "default",
 					Items: []domain.ReadyListItem{
 						{
-							ID:       "CORE-1",
-							Title:    "Health endpoints",
-							Status:   domain.StatusTodo,
-							Priority: domain.PriorityHigh,
-							EpicID:   "epic-1",
-							Tags:     []string{"infra", "api"},
+							ID:          "CORE-1",
+							Title:       "Health endpoints",
+							Description: "Add readiness and liveness checks",
+							Status:      domain.StatusTodo,
+							Priority:    domain.PriorityHigh,
+							EpicID:      "epic-1",
+							Tags:        []string{"infra", "api"},
 							Unblocks: []domain.TaskListItem{
 								{
 									ID:       "CORE-5",
@@ -570,12 +571,13 @@ func TestRunReadyCallsServerTOON(t *testing.T) {
 					ProjectID: "default",
 					Items: []domain.ReadyListItem{
 						{
-							ID:       "CORE-1",
-							Title:    "Health endpoints",
-							Status:   domain.StatusTodo,
-							Priority: domain.PriorityHigh,
-							EpicID:   "epic-1",
-							Tags:     []string{"infra", "api"},
+							ID:          "CORE-1",
+							Title:       "Health endpoints",
+							Description: "Add readiness and liveness checks",
+							Status:      domain.StatusTodo,
+							Priority:    domain.PriorityHigh,
+							EpicID:      "epic-1",
+							Tags:        []string{"infra", "api"},
 							Unblocks: []domain.TaskListItem{
 								{
 									ID:       "CORE-5",
@@ -608,6 +610,7 @@ func TestRunReadyCallsServerTOON(t *testing.T) {
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "ready[1]:")
 	require.Contains(t, stdout.String(), "- id: CORE-1")
+	require.Contains(t, stdout.String(), "  description: \"Add readiness and liveness checks\"")
 	require.Contains(t, stdout.String(), "dependents[1]{id,title,status,priority}:")
 	require.Contains(t, stdout.String(), "CORE-5,Backups,todo,1")
 }
@@ -831,6 +834,64 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 	if !strings.Contains(stderr.String(), "unknown command") {
 		t.Fatalf("expected unknown command error, got %q", stderr.String())
 	}
+}
+
+func TestRunTopLevelHelpIsFlat(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"--help"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.NotContains(t, stdout.String(), "Command groups:")
+	require.Contains(t, stdout.String(), "ptodo quickstart")
+	require.Contains(t, stdout.String(), "ptodo epic create")
+	require.Contains(t, stdout.String(), "ptodo task update")
+}
+
+func TestRunQuickstart(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"quickstart"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "# Phatodo Quickstart")
+	require.Contains(t, stdout.String(), "ptodo admin bootstrap")
+	require.Contains(t, stdout.String(), "ptodo --toon ready")
+	require.Contains(t, stdout.String(), "Good usage:")
+	require.Contains(t, stdout.String(), "Bad usage:")
+	require.Contains(t, stdout.String(), `ptodo task update ABC-1 --criteria-json '["docs written","tests passing"]'`)
+}
+
+func TestRunQuickstartHelp(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"quickstart", "--help"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "Usage:")
+	require.Contains(t, stdout.String(), "ptodo quickstart")
+	require.Contains(t, stdout.String(), "Show quick reference for AI agents")
+}
+
+func TestRunTaskFamilyHelp(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"task", "--help"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "ptodo task")
+	require.Contains(t, stdout.String(), "ptodo task create")
+	require.Contains(t, stdout.String(), "ptodo task delete")
+}
+
+func TestRunTaskCreateHelp(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := Run([]string{"task", "create", "--help"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "Usage:")
+	require.Contains(t, stdout.String(), "ptodo task create -t \"Title\"")
 }
 
 func TestRunConfigListFetchesProjectConfig(t *testing.T) {

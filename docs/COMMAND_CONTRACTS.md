@@ -62,6 +62,17 @@ Allowed comment kinds:
 
 ## Setup
 
+### `ptodo quickstart`
+
+Server request:
+- none
+
+Contract:
+- print a concise agent-facing reference for the command surface, core workflow, and the text-vs-JSON field split
+
+Response:
+- a quickstart guide in markdown-like plain text
+
 ### `ptodo admin init`
 
 Purpose:

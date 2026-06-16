@@ -67,7 +67,7 @@ Before an epic can be marked `completed`:
 
 ## Acceptance Criteria
 
-Acceptance criteria are stored as an ordered list.
+Acceptance criteria are stored as an ordered list in `acceptance_criteria`, and the CLI sends them as JSON arrays through `--criteria-json` rather than as a single free-form text field.
 
 Rules:
 
@@ -77,7 +77,9 @@ Rules:
 
 ## Completion Evidence
 
-Completion evidence is an ordered list of items such as:
+Completion evidence is stored as an ordered list in `completion_evidence`, and the CLI sends it as a JSON array through `--evidence-json` rather than as a single free-form text field.
+
+Completion evidence items can be things such as:
 
 - links
 - notes

@@ -14,10 +14,14 @@ The `ptodo` executable should keep the command shape preserved in `docs/trekker_
 - Workflow: `ready`
 - Config: `config list`, `config get`, `config set`, `config unset`
 - Query: `search`, `history`, `list`
+- Quickstart: `quickstart`
 
 ## Behavior
 
 Support `--toon` as compact agent output using the TOON reference in `docs/TOON_SPEC.md`. Preserve status values, priority values, and task workflow rules from the Trekker reference. Prefer additive enhancements over breaking command changes.
+
+`ptodo --help` should print a flat list of commands, and every command should accept `--help` or `-h` to show its own usage shape.
+`ptodo quickstart` should print a short agent-oriented reference similar to Trekker's quickstart output.
 
 `config list` is the first server-backed command and should print the project configuration returned from `/api/v1/projects/{projectID}/config`.
 `ready` should print top-level todo tasks that are currently unblocked, ordered by priority, with optional `--epic` scoping and inline `dependents` hints for tasks that become available next.
@@ -30,6 +34,8 @@ The Trekker-compatible command surface is extended to cover schema-backed fields
 - `--criteria-json` for acceptance criteria
 - `--summary` and `--evidence-json` for completion metadata
 - `-k/--kind` for comment type
+
+The criteria and evidence flags intentionally take JSON arrays because the server stores ordered lists for those fields. Use `description` for plain narrative text and `completion_summary` for a text summary of what was finished.
 
 ## Client Configuration
 

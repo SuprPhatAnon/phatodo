@@ -112,7 +112,7 @@ RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	completed_at, created_at, updated_at;
 
 -- name: ListReadyTasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags
+SELECT id, title, description, status, priority, epic_id, parent_task_id, tags
 FROM tasks t
 WHERE t.project_id = sqlc.arg(project_id)
   AND t.parent_task_id IS NULL

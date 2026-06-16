@@ -298,7 +298,7 @@ func (q *Queries) ListReadyDependents(ctx context.Context, arg ListReadyDependen
 }
 
 const listReadyTasks = `-- name: ListReadyTasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags
+SELECT id, title, description, status, priority, epic_id, parent_task_id, tags
 FROM tasks t
 WHERE t.project_id = $1
   AND t.parent_task_id IS NULL
@@ -323,6 +323,7 @@ type ListReadyTasksParams struct {
 type ListReadyTasksRow struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
+	Description  *string  `json:"description"`
 	Status       string   `json:"status"`
 	Priority     int32    `json:"priority"`
 	EpicID       *string  `json:"epic_id"`
@@ -342,6 +343,7 @@ func (q *Queries) ListReadyTasks(ctx context.Context, arg ListReadyTasksParams) 
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
+			&i.Description,
 			&i.Status,
 			&i.Priority,
 			&i.EpicID,

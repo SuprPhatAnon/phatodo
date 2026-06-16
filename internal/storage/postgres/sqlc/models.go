@@ -92,6 +92,11 @@ type ProjectConfig struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type SchemaMigration struct {
+	Version   string    `json:"version"`
+	AppliedAt time.Time `json:"applied_at"`
+}
+
 type SearchIndex struct {
 	ID          int64       `json:"id"`
 	WorkspaceID string      `json:"workspace_id"`

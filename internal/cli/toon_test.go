@@ -87,12 +87,13 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 	var buf bytes.Buffer
 
 	writeReadyListItem(&buf, 0, domain.ReadyListItem{
-		ID:       "CORE-1",
-		Title:    "Health endpoints",
-		Status:   domain.StatusTodo,
-		Priority: domain.PriorityHigh,
-		EpicID:   "epic-1",
-		Tags:     []string{"infra", "api"},
+		ID:          "CORE-1",
+		Title:       "Health endpoints",
+		Description: "Add readiness and liveness checks",
+		Status:      domain.StatusTodo,
+		Priority:    domain.PriorityHigh,
+		EpicID:      "epic-1",
+		Tags:        []string{"infra", "api"},
 		Unblocks: []domain.TaskListItem{
 			{
 				ID:       "CORE-5",
@@ -105,6 +106,7 @@ func TestWriteReadyListItemTOON(t *testing.T) {
 		},
 	})
 
+	require.Contains(t, buf.String(), "description: \"Add readiness and liveness checks\"")
 	require.Contains(t, buf.String(), "dependents[1]{id,title,status,priority}:\n")
 	require.Contains(t, buf.String(), "    - CORE-5,Backups,todo,1\n")
 }

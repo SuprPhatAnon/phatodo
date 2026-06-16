@@ -6,6 +6,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 
 - [x] `ptodo admin init`
 - [x] `ptodo admin bootstrap`
+- [x] `ptodo quickstart`
 - [x] `ptodo config list`
 - [x] `ptodo config get`
 - [x] `ptodo config set`
@@ -50,6 +51,7 @@ This document maps the `ptodo` command family to its API endpoints and the datab
 
 | Command | API endpoint | Primary tables | Adjunct tables / notes |
 | --- | --- | --- | --- |
+| `ptodo quickstart` | none | none | Prints a local quick reference for AI agents; no API request. |
 | `ptodo admin init` | `POST /api/v1/admin/init` | `users` | Creates the first admin user only; fails if any admin user already exists. |
 | `ptodo admin bootstrap` | `POST /api/v1/admin/bootstrap` | `workspaces`, `projects`, `users`, `user_project_access` | Creates the bootstrap workspace/project, the project-scoped CLI identity, and writes `<repo>/.phatodo/config.json`. Fails if the target project already exists. |
 | `ptodo wipe -y` | none | none | Removes local client state only. |

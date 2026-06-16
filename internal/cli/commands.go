@@ -14,35 +14,29 @@ import (
 	"github.com/SuprPhatAnon/phatodo/internal/domain"
 )
 
-var commandGroups = []struct {
-	Name     string
-	Commands []string
-}{
-	{"setup", []string{"init", "wipe -y"}},
-	{"admin", []string{"admin init", "admin bootstrap"}},
-	{"epic", []string{"epic create", "epic list", "epic show", "epic update", "epic complete", "epic delete"}},
-	{"task", []string{"task create", "task list", "task show", "task update", "task delete"}},
-	{"subtask", []string{"subtask create", "subtask list", "subtask update", "subtask delete"}},
-	{"comment", []string{"comment add", "comment list", "comment update", "comment delete"}},
-	{"dep", []string{"dep add", "dep remove", "dep list"}},
-	{"lock", []string{"lock acquire", "lock release", "lock list"}},
-	{"workflow", []string{"ready"}},
-	{"config", []string{"config list", "config get", "config set", "config unset"}},
-	{"query", []string{"search", "history", "list"}},
-}
-
 // Run is the CLI boundary. It currently validates the Trekker-compatible
 // command shape while the API client and persistence behavior are built out.
 func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 	setOutputMode(false)
-	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+	if len(args) == 0 {
 		printHelp(stdout)
 		return 0
 	}
-
 	if args[0] == "--toon" {
 		setOutputMode(true)
 		args = args[1:]
+		if len(args) == 0 {
+			fmt.Fprintln(stderr, "missing command after --toon")
+			return 2
+		}
+	}
+	if args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		printHelp(stdout)
+		return 0
+	}
+	if helpRequested(args) {
+		printCommandHelp(stdout, args)
+		return 0
 	}
 	if len(args) == 0 {
 		fmt.Fprintln(stderr, "missing command after --toon")
@@ -51,6 +45,10 @@ func Run(args []string, stdout io.Writer, stderr io.Writer) int {
 
 	if args[0] == "init" {
 		return runInit(stdout, stderr)
+	}
+	if args[0] == "quickstart" {
+		printQuickstart(stdout)
+		return 0
 	}
 
 	if len(args) >= 2 && args[0] == "admin" {
@@ -2319,12 +2317,9 @@ func isAllowedCommentKind(value string) bool {
 }
 
 func knownCommand(args []string) bool {
-	for _, group := range commandGroups {
-		for _, command := range group.Commands {
-			parts := strings.Fields(command)
-			if len(args) >= len(parts) && equalPrefix(args, parts) {
-				return true
-			}
+	for _, spec := range commandSpecs {
+		if len(args) >= len(spec.path) && equalPrefix(args, spec.path) {
+			return true
 		}
 	}
 	return false
@@ -2337,19 +2332,6 @@ func equalPrefix(args []string, parts []string) bool {
 		}
 	}
 	return true
-}
-
-func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "ptodo - centralized Trekker-compatible task tracking")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  ptodo [--toon] <command> [flags]")
-	fmt.Fprintln(w, "  ptodo init")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Command groups:")
-	for _, group := range commandGroups {
-		fmt.Fprintf(w, "  %-8s %s\n", group.Name, strings.Join(group.Commands, ", "))
-	}
 }
 
 type taskListOptions struct {
