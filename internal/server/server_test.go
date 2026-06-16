@@ -45,6 +45,10 @@ func TestDecodeTaskCreateRequestDefaultsKindAndRejectsBugWithoutRootCause(t *tes
 	require.NoError(t, err)
 	require.Equal(t, domain.TaskKindFeature, req.Kind)
 
+	req, err = decodeTaskCreateRequest(strings.NewReader(`{"title":"Plan files","issue_prefix":"ABC","planned_files":["internal/cli/commands.go"]}`))
+	require.NoError(t, err)
+	require.Equal(t, []string{"internal/cli/commands.go"}, req.PlannedFiles)
+
 	_, err = decodeTaskCreateRequest(strings.NewReader(`{"title":"Write docs","issue_prefix":"ABC","kind":"bug"}`))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "root_cause_analysis is required when kind is bug")
@@ -60,6 +64,17 @@ func TestDecodeTaskUpdateRequestValidatesRootCauseAnalysisEmpty(t *testing.T) {
 	_, err := decodeTaskUpdateRequest(strings.NewReader(`{"root_cause_analysis":"   "}`))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "root_cause_analysis cannot be empty")
+}
+
+func TestDecodeTaskUpdateRequestValidatesChangedFilesEmpty(t *testing.T) {
+	_, err := decodeTaskUpdateRequest(strings.NewReader(`{"changed_files":["   "]}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "changed_files cannot be empty")
+
+	req, err := decodeTaskUpdateRequest(strings.NewReader(`{"changed_files":["internal/server/handlers.go"]}`))
+	require.NoError(t, err)
+	require.NotNil(t, req.ChangedFiles)
+	require.Equal(t, []string{"internal/server/handlers.go"}, *req.ChangedFiles)
 }
 
 func TestEpicListReturnsUnavailableWithoutStore(t *testing.T) {

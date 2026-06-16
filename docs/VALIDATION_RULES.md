@@ -67,8 +67,14 @@ Completion metadata includes:
 
 - `completed_by`
 - `completed_at`
+- `changed_files`
 - `completion_summary`
 - `completion_evidence`
+
+Completion requires:
+
+- at least one `changed_files` item
+- at least one `completion_evidence` item
 
 ### Epics
 
@@ -91,6 +97,10 @@ Rules:
 ## Completion Evidence
 
 Completion evidence is stored as an ordered list in `completion_evidence`, and the CLI sends it as a JSON array through `--evidence-json` rather than as a single free-form text field.
+
+Planned files are stored as an ordered JSON string array in `planned_files`, and create commands send them through `--planned-files-json`.
+
+Changed files are stored as an ordered JSON string array in `changed_files`, and update commands send them through `--changed-files-json`.
 
 Completion evidence items can be things such as:
 

@@ -43,7 +43,7 @@ spec:
               until pg_isready -d "$PHATODO_DATABASE_URL"; do
                 sleep 2
               done
-              until psql "$PHATODO_DATABASE_URL" -Atqc "SELECT 1 FROM schema_migrations WHERE version = '0002_task_kind_root_cause'" | grep -qx 1; do
+              until psql "$PHATODO_DATABASE_URL" -Atqc "SELECT 1 FROM schema_migrations WHERE version = '0003_task_file_metadata'" | grep -qx 1; do
                 sleep 2
               done
       containers:

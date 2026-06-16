@@ -75,6 +75,8 @@ Render:
   issue_prefix: ABC
   title: "Write docs"
   status: todo
+  plannedFiles[1]:
+    - internal/cli/commands.go
   priority: 2
 ```
 
@@ -89,6 +91,8 @@ tasks[1]:
     priority: 2
     status: in_progress
     epicId: epic-1
+    changedFiles[1]:
+      - internal/cli/commands.go
 ```
 
 `ptodo epic list --status in_progress --limit 20`:

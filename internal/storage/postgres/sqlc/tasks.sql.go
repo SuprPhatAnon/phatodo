@@ -8,20 +8,22 @@ package db
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
 	id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	created_by, updated_by, title, description, kind, root_cause_analysis, priority,
-	status, tags, acceptance_criteria
+	status, tags, planned_files, acceptance_criteria
 ) VALUES (
 	$1, $2, $3, NULLIF($4, ''),
 	NULLIF($5, ''), NULLIF($6, ''),
-	NULLIF($7, ''), NULL, $8, NULLIF($9, ''), $10, $11,
-	'todo', $12, $13::jsonb
+	NULLIF($7, ''), NULL, $8, NULLIF($9, ''), $10, $11, $12,
+	'todo', $13, $14::jsonb, $15::jsonb
 )
-RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis
+RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis, planned_files
 `
 
 type CreateTaskParams struct {
@@ -38,18 +40,20 @@ type CreateTaskParams struct {
 	RootCauseAnalysis  string      `json:"root_cause_analysis"`
 	Priority           int32       `json:"priority"`
 	Tags               []string    `json:"tags"`
+	PlannedFiles       []byte      `json:"planned_files"`
 	AcceptanceCriteria []byte      `json:"acceptance_criteria"`
 }
 
 type CreateTaskRow struct {
-	ID                 string `json:"id"`
-	Title              string `json:"title"`
-	Status             string `json:"status"`
-	Priority           int32  `json:"priority"`
-	ProjectID          string `json:"project_id"`
-	WorkspaceID        string `json:"workspace_id"`
-	Kind               string `json:"kind"`
-	RootCauseAnalysis  string `json:"root_cause_analysis"`
+	ID                string `json:"id"`
+	Title             string `json:"title"`
+	Status            string `json:"status"`
+	Priority          int32  `json:"priority"`
+	ProjectID         string `json:"project_id"`
+	WorkspaceID       string `json:"workspace_id"`
+	Kind              string `json:"kind"`
+	RootCauseAnalysis string `json:"root_cause_analysis"`
+	PlannedFiles      []byte `json:"planned_files"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateTaskRow, error) {
@@ -67,6 +71,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateT
 		arg.RootCauseAnalysis,
 		arg.Priority,
 		arg.Tags,
+		arg.PlannedFiles,
 		arg.AcceptanceCriteria,
 	)
 	var i CreateTaskRow
@@ -79,6 +84,7 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateT
 		&i.WorkspaceID,
 		&i.Kind,
 		&i.RootCauseAnalysis,
+		&i.PlannedFiles,
 	)
 	return i, err
 }
@@ -86,9 +92,9 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateT
 const deleteTask = `-- name: DeleteTask :one
 DELETE FROM tasks
 WHERE project_id = $1 AND id = $2
-RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	kind, root_cause_analysis, created_by, updated_by, completed_by, title, description, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+RETURNING id, workspace_id, project_id, epic_id, parent_task_id, kind, root_cause_analysis, assigned_to,
+	created_by, updated_by, completed_by, title, description, priority,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 `
 
@@ -97,9 +103,36 @@ type DeleteTaskParams struct {
 	TaskID    string `json:"task_id"`
 }
 
-func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) (Task, error) {
+type DeleteTaskRow struct {
+	ID                 string             `json:"id"`
+	WorkspaceID        string             `json:"workspace_id"`
+	ProjectID          string             `json:"project_id"`
+	EpicID             *string            `json:"epic_id"`
+	ParentTaskID       *string            `json:"parent_task_id"`
+	Kind               string             `json:"kind"`
+	RootCauseAnalysis  string             `json:"root_cause_analysis"`
+	AssignedTo         *string            `json:"assigned_to"`
+	CreatedBy          *string            `json:"created_by"`
+	UpdatedBy          *string            `json:"updated_by"`
+	CompletedBy        *string            `json:"completed_by"`
+	Title              string             `json:"title"`
+	Description        *string            `json:"description"`
+	Priority           int32              `json:"priority"`
+	Status             string             `json:"status"`
+	Tags               []string           `json:"tags"`
+	PlannedFiles       []byte             `json:"planned_files"`
+	ChangedFiles       []byte             `json:"changed_files"`
+	AcceptanceCriteria []byte             `json:"acceptance_criteria"`
+	CompletionEvidence []byte             `json:"completion_evidence"`
+	CompletionSummary  *string            `json:"completion_summary"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) (DeleteTaskRow, error) {
 	row := q.db.QueryRow(ctx, deleteTask, arg.ProjectID, arg.TaskID)
-	var i Task
+	var i DeleteTaskRow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -117,6 +150,8 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) (Task, e
 		&i.Priority,
 		&i.Status,
 		&i.Tags,
+		&i.PlannedFiles,
+		&i.ChangedFiles,
 		&i.AcceptanceCriteria,
 		&i.CompletionEvidence,
 		&i.CompletionSummary,
@@ -188,7 +223,7 @@ func (q *Queries) GetTaskCreateParentInfo(ctx context.Context, arg GetTaskCreate
 const getTaskDetail = `-- name: GetTaskDetail :one
 SELECT id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 FROM tasks
 WHERE project_id = $1 AND id = $2
@@ -199,9 +234,36 @@ type GetTaskDetailParams struct {
 	TaskID    string `json:"task_id"`
 }
 
-func (q *Queries) GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (Task, error) {
+type GetTaskDetailRow struct {
+	ID                 string             `json:"id"`
+	WorkspaceID        string             `json:"workspace_id"`
+	ProjectID          string             `json:"project_id"`
+	EpicID             *string            `json:"epic_id"`
+	ParentTaskID       *string            `json:"parent_task_id"`
+	AssignedTo         *string            `json:"assigned_to"`
+	CreatedBy          *string            `json:"created_by"`
+	UpdatedBy          *string            `json:"updated_by"`
+	CompletedBy        *string            `json:"completed_by"`
+	Title              string             `json:"title"`
+	Description        *string            `json:"description"`
+	Kind               string             `json:"kind"`
+	RootCauseAnalysis  string             `json:"root_cause_analysis"`
+	Priority           int32              `json:"priority"`
+	Status             string             `json:"status"`
+	Tags               []string           `json:"tags"`
+	PlannedFiles       []byte             `json:"planned_files"`
+	ChangedFiles       []byte             `json:"changed_files"`
+	AcceptanceCriteria []byte             `json:"acceptance_criteria"`
+	CompletionEvidence []byte             `json:"completion_evidence"`
+	CompletionSummary  *string            `json:"completion_summary"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+func (q *Queries) GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (GetTaskDetailRow, error) {
 	row := q.db.QueryRow(ctx, getTaskDetail, arg.ProjectID, arg.TaskID)
-	var i Task
+	var i GetTaskDetailRow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -219,6 +281,8 @@ func (q *Queries) GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (T
 		&i.Priority,
 		&i.Status,
 		&i.Tags,
+		&i.PlannedFiles,
+		&i.ChangedFiles,
 		&i.AcceptanceCriteria,
 		&i.CompletionEvidence,
 		&i.CompletionSummary,
@@ -527,9 +591,10 @@ SET updated_by = $1,
 	tags = COALESCE($8, tags),
 	epic_id = CASE WHEN $9::bool THEN NULL ELSE COALESCE($10, epic_id) END,
 	assigned_to = COALESCE($11, assigned_to),
-	acceptance_criteria = COALESCE($12::jsonb, acceptance_criteria),
-	completion_summary = COALESCE($13, completion_summary),
-	completion_evidence = COALESCE($14::jsonb, completion_evidence),
+	changed_files = COALESCE($12::jsonb, changed_files),
+	acceptance_criteria = COALESCE($13::jsonb, acceptance_criteria),
+	completion_summary = COALESCE($14, completion_summary),
+	completion_evidence = COALESCE($15::jsonb, completion_evidence),
 	completed_by = CASE
 		WHEN COALESCE($7, '') = 'completed' THEN COALESCE(NULLIF($1, ''), completed_by)
 		ELSE completed_by
@@ -538,10 +603,10 @@ SET updated_by = $1,
 		WHEN COALESCE($7, '') = 'completed' THEN COALESCE(completed_at, now())
 		ELSE completed_at
 	END
-WHERE project_id = $15 AND id = $16
+WHERE project_id = $16 AND id = $17
 RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 `
 
@@ -557,6 +622,7 @@ type UpdateTaskParams struct {
 	ClearEpic          bool     `json:"clear_epic"`
 	EpicID             *string  `json:"epic_id"`
 	AssignedTo         *string  `json:"assigned_to"`
+	ChangedFiles       []byte   `json:"changed_files"`
 	AcceptanceCriteria []byte   `json:"acceptance_criteria"`
 	CompletionSummary  *string  `json:"completion_summary"`
 	CompletionEvidence []byte   `json:"completion_evidence"`
@@ -564,7 +630,34 @@ type UpdateTaskParams struct {
 	TaskID             string   `json:"task_id"`
 }
 
-func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error) {
+type UpdateTaskRow struct {
+	ID                 string             `json:"id"`
+	WorkspaceID        string             `json:"workspace_id"`
+	ProjectID          string             `json:"project_id"`
+	EpicID             *string            `json:"epic_id"`
+	ParentTaskID       *string            `json:"parent_task_id"`
+	AssignedTo         *string            `json:"assigned_to"`
+	CreatedBy          *string            `json:"created_by"`
+	UpdatedBy          *string            `json:"updated_by"`
+	CompletedBy        *string            `json:"completed_by"`
+	Title              string             `json:"title"`
+	Description        *string            `json:"description"`
+	Kind               string             `json:"kind"`
+	RootCauseAnalysis  string             `json:"root_cause_analysis"`
+	Priority           int32              `json:"priority"`
+	Status             string             `json:"status"`
+	Tags               []string           `json:"tags"`
+	PlannedFiles       []byte             `json:"planned_files"`
+	ChangedFiles       []byte             `json:"changed_files"`
+	AcceptanceCriteria []byte             `json:"acceptance_criteria"`
+	CompletionEvidence []byte             `json:"completion_evidence"`
+	CompletionSummary  *string            `json:"completion_summary"`
+	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+}
+
+func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (UpdateTaskRow, error) {
 	row := q.db.QueryRow(ctx, updateTask,
 		arg.UpdatedBy,
 		arg.Title,
@@ -577,13 +670,14 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		arg.ClearEpic,
 		arg.EpicID,
 		arg.AssignedTo,
+		arg.ChangedFiles,
 		arg.AcceptanceCriteria,
 		arg.CompletionSummary,
 		arg.CompletionEvidence,
 		arg.ProjectID,
 		arg.TaskID,
 	)
-	var i Task
+	var i UpdateTaskRow
 	err := row.Scan(
 		&i.ID,
 		&i.WorkspaceID,
@@ -601,6 +695,8 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.Priority,
 		&i.Status,
 		&i.Tags,
+		&i.PlannedFiles,
+		&i.ChangedFiles,
 		&i.AcceptanceCriteria,
 		&i.CompletionEvidence,
 		&i.CompletionSummary,

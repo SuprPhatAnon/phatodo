@@ -421,7 +421,7 @@ func (s *Store) archiveTaskTx(ctx context.Context, tx pgx.Tx, projectID string, 
 		return domain.TaskDetail{}, fmt.Errorf("archive task: %w", err)
 	}
 
-	afterTask, err := taskDetailFromSQLC(after)
+	afterTask, err := taskDetailFromUpdateTaskRow(after)
 	if err != nil {
 		return domain.TaskDetail{}, fmt.Errorf("decode archived task: %w", err)
 	}

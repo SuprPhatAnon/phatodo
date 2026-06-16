@@ -229,6 +229,7 @@ Optional input:
 - `--tags "a,b"`
 - `-a <user-id>`
 - `--root-cause-analysis <text>`
+- `--planned-files-json '["..."]'`
 - `--criteria-json '["..."]'`
 
 Server request:
@@ -242,6 +243,7 @@ Expected body fields:
 - `epic_id`
 - `tags`
 - `assigned_to`
+- `planned_files`
 - `acceptance_criteria`
 - `kind`
 - `root_cause_analysis`
@@ -293,6 +295,7 @@ Optional input:
 - `--no-epic`
 - `-a <user-id>`
 - `--root-cause-analysis <text>`
+- `--changed-files-json '["..."]'`
 - `--criteria-json '["..."]'`
 - `--summary <completion-summary>`
 - `--evidence-json '["..."]'`
@@ -322,6 +325,7 @@ Optional input:
 - `-a <user-id>`
 - `-k <task|bug|feature|chore|spike>`
 - `--root-cause-analysis <text>`
+- `--planned-files-json '["..."]'`
 - `--criteria-json '["..."]'`
 
 Server request:
@@ -349,6 +353,7 @@ Optional input:
 - `-p <priority>`
 - `-s <status>`
 - `-a <user-id>`
+- `--changed-files-json '["..."]'`
 - `--criteria-json '["..."]'`
 - `--summary <completion-summary>`
 - `--evidence-json '["..."]'`

@@ -21,7 +21,7 @@ type Querier interface {
 	DeleteDependency(ctx context.Context, arg DeleteDependencyParams) (Dependency, error)
 	DeleteEpic(ctx context.Context, arg DeleteEpicParams) (Epic, error)
 	DeleteProjectConfig(ctx context.Context, arg DeleteProjectConfigParams) (DeleteProjectConfigRow, error)
-	DeleteTask(ctx context.Context, arg DeleteTaskParams) (Task, error)
+	DeleteTask(ctx context.Context, arg DeleteTaskParams) (DeleteTaskRow, error)
 	GetActiveWorkItemLock(ctx context.Context, arg GetActiveWorkItemLockParams) (WorkItemLock, error)
 	GetComment(ctx context.Context, arg GetCommentParams) (Comment, error)
 	GetDependency(ctx context.Context, arg GetDependencyParams) (Dependency, error)
@@ -31,7 +31,7 @@ type Querier interface {
 	GetProjectIDByWorkspaceAndName(ctx context.Context, arg GetProjectIDByWorkspaceAndNameParams) (string, error)
 	GetProjectWorkspaceID(ctx context.Context, projectID string) (string, error)
 	GetTaskCreateParentInfo(ctx context.Context, arg GetTaskCreateParentInfoParams) (GetTaskCreateParentInfoRow, error)
-	GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (Task, error)
+	GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (GetTaskDetailRow, error)
 	GetUserID(ctx context.Context, userID string) (string, error)
 	GetWorkItemLock(ctx context.Context, arg GetWorkItemLockParams) (WorkItemLock, error)
 	GetWorkspaceIDBySlug(ctx context.Context, slug string) (string, error)
@@ -65,7 +65,7 @@ type Querier interface {
 	SetProjectConfig(ctx context.Context, arg SetProjectConfigParams) (SetProjectConfigRow, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (Comment, error)
 	UpdateEpic(ctx context.Context, arg UpdateEpicParams) (Epic, error)
-	UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, error)
+	UpdateTask(ctx context.Context, arg UpdateTaskParams) (UpdateTaskRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

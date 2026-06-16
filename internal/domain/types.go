@@ -73,20 +73,22 @@ type TaskCreateRequest struct {
 	EpicID             string    `json:"epic_id"`
 	RootCauseAnalysis  string    `json:"root_cause_analysis,omitempty"`
 	Tags               []string  `json:"tags"`
+	PlannedFiles       []string  `json:"planned_files,omitempty"`
 	AssignedTo         string    `json:"assigned_to"`
 	AcceptanceCriteria []string  `json:"acceptance_criteria"`
 }
 
 type TaskCreateResponse struct {
-	ID          string   `json:"id"`
-	IssuePrefix string   `json:"issue_prefix"`
-	Title       string   `json:"title"`
-	Kind        TaskKind `json:"kind"`
-	Status      Status   `json:"status"`
-	RootCause   string   `json:"root_cause_analysis,omitempty"`
-	Priority    Priority `json:"priority"`
-	ProjectID   string   `json:"project_id"`
-	WorkspaceID string   `json:"workspace_id"`
+	ID           string   `json:"id"`
+	IssuePrefix  string   `json:"issue_prefix"`
+	Title        string   `json:"title"`
+	Kind         TaskKind `json:"kind"`
+	Status       Status   `json:"status"`
+	RootCause    string   `json:"root_cause_analysis,omitempty"`
+	PlannedFiles []string `json:"planned_files,omitempty"`
+	Priority     Priority `json:"priority"`
+	ProjectID    string   `json:"project_id"`
+	WorkspaceID  string   `json:"workspace_id"`
 }
 
 type TaskListItem struct {
@@ -124,6 +126,8 @@ type TaskDetail struct {
 	Status             Status    `json:"status"`
 	Priority           Priority  `json:"priority"`
 	Tags               []string  `json:"tags,omitempty"`
+	PlannedFiles       []string  `json:"planned_files,omitempty"`
+	ChangedFiles       []string  `json:"changed_files,omitempty"`
 	AcceptanceCriteria []string  `json:"acceptance_criteria,omitempty"`
 	CompletionEvidence []string  `json:"completion_evidence,omitempty"`
 	CompletionSummary  string    `json:"completion_summary,omitempty"`
@@ -144,6 +148,7 @@ type TaskUpdateRequest struct {
 	NoEpic             bool      `json:"no_epic,omitempty"`
 	AssignedTo         *string   `json:"assigned_to,omitempty"`
 	RootCauseAnalysis  *string   `json:"root_cause_analysis,omitempty"`
+	ChangedFiles       *[]string `json:"changed_files,omitempty"`
 	AcceptanceCriteria *[]string `json:"acceptance_criteria,omitempty"`
 	CompletionSummary  *string   `json:"completion_summary,omitempty"`
 	CompletionEvidence *[]string `json:"completion_evidence,omitempty"`

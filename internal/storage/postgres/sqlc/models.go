@@ -123,8 +123,6 @@ type Task struct {
 	CompletedBy        *string            `json:"completed_by"`
 	Title              string             `json:"title"`
 	Description        *string            `json:"description"`
-	Kind               string             `json:"kind"`
-	RootCauseAnalysis  string             `json:"root_cause_analysis"`
 	Priority           int32              `json:"priority"`
 	Status             string             `json:"status"`
 	Tags               []string           `json:"tags"`
@@ -134,6 +132,10 @@ type Task struct {
 	CompletedAt        pgtype.Timestamptz `json:"completed_at"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
+	Kind               string             `json:"kind"`
+	RootCauseAnalysis  string             `json:"root_cause_analysis"`
+	PlannedFiles       []byte             `json:"planned_files"`
+	ChangedFiles       []byte             `json:"changed_files"`
 }
 
 type User struct {

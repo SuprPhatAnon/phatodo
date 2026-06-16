@@ -41,14 +41,14 @@ SELECT counter FROM upserted;
 INSERT INTO tasks (
 	id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	created_by, updated_by, title, description, kind, root_cause_analysis, priority,
-	status, tags, acceptance_criteria
+	status, tags, planned_files, acceptance_criteria
 ) VALUES (
 	sqlc.arg(id), sqlc.arg(workspace_id), sqlc.arg(project_id), NULLIF(sqlc.arg(epic_id), ''),
 	NULLIF(sqlc.arg(parent_task_id), ''), NULLIF(sqlc.arg(assigned_to), ''),
 	NULLIF(sqlc.arg(created_by), ''), NULL, sqlc.arg(title), NULLIF(sqlc.arg(description), ''), sqlc.arg(kind), sqlc.arg(root_cause_analysis), sqlc.arg(priority),
-	'todo', sqlc.arg(tags), sqlc.arg(acceptance_criteria)::jsonb
+	'todo', sqlc.arg(tags), sqlc.arg(planned_files)::jsonb, sqlc.arg(acceptance_criteria)::jsonb
 )
-RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis;
+RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis, planned_files;
 
 -- name: ListTasks :many
 SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
@@ -70,7 +70,7 @@ ORDER BY priority ASC, created_at ASC, id ASC;
 -- name: GetTaskDetail :one
 SELECT id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id) AND id = sqlc.arg(task_id);
@@ -88,6 +88,7 @@ SET updated_by = sqlc.arg(updated_by),
 	tags = COALESCE(sqlc.narg(tags), tags),
 	epic_id = CASE WHEN sqlc.arg(clear_epic)::bool THEN NULL ELSE COALESCE(sqlc.narg(epic_id), epic_id) END,
 	assigned_to = COALESCE(sqlc.narg(assigned_to), assigned_to),
+	changed_files = COALESCE(sqlc.narg(changed_files)::jsonb, changed_files),
 	acceptance_criteria = COALESCE(sqlc.narg(acceptance_criteria)::jsonb, acceptance_criteria),
 	completion_summary = COALESCE(sqlc.narg(completion_summary), completion_summary),
 	completion_evidence = COALESCE(sqlc.narg(completion_evidence)::jsonb, completion_evidence),
@@ -101,8 +102,8 @@ SET updated_by = sqlc.arg(updated_by),
 	END
 WHERE project_id = sqlc.arg(project_id) AND id = sqlc.arg(task_id)
 RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, completed_by, title, description, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at;
 
 -- name: DeleteTask :one
@@ -110,7 +111,7 @@ DELETE FROM tasks
 WHERE project_id = sqlc.arg(project_id) AND id = sqlc.arg(task_id)
 RETURNING id, workspace_id, project_id, epic_id, parent_task_id, kind, root_cause_analysis, assigned_to,
 	created_by, updated_by, completed_by, title, description, priority,
-	status, tags, acceptance_criteria, completion_evidence, completion_summary,
+	status, tags, planned_files, changed_files, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at;
 
 -- name: ListReadyTasks :many

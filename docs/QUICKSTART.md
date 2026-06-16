@@ -26,10 +26,10 @@ ptodo epic complete <epic-id>
 ptodo epic delete <epic-id>
 
 ### Tasks
-ptodo task create -t "Title" --prefix <prefix> (or --issue-prefix <prefix>) [-d "desc"] [-p 0-5] [-e <epic-id>] [--kind task|bug|feature|chore|spike] [--root-cause-analysis "why"] [--tags "a,b"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
+ptodo task create -t "Title" --prefix <prefix> (or --issue-prefix <prefix>) [-d "desc"] [-p 0-5] [-e <epic-id>] [--kind task|bug|feature|chore|spike] [--root-cause-analysis "why"] [--planned-files-json '["file.go"]'] [--tags "a,b"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 ptodo task list [--status <status>] [--epic <epic-id>] [--limit <n>]
 ptodo task show <task-id>
-ptodo task update <task-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-k task|bug|feature|chore|spike] [--root-cause-analysis "why"] [--tags "a,b"] [-e <epic-id>] [--no-epic] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
+ptodo task update <task-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-k task|bug|feature|chore|spike] [--root-cause-analysis "why"] [--changed-files-json '["file.go"]'] [--tags "a,b"] [-e <epic-id>] [--no-epic] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
 ptodo task delete <task-id>
 
 ### Updating Criteria and Evidence
@@ -39,16 +39,16 @@ Use `--summary` and `--evidence-json` when the work is finished and you need to 
 
 Good usage:
 ptodo task update ABC-1 --criteria-json '["docs written","tests passing"]'
-ptodo task update ABC-1 -s completed --summary "Implemented in internal/cli" --evidence-json '["go test ./internal/cli","docs/QUICKSTART.md updated"]'
+ptodo task update ABC-1 -s completed --summary "Implemented in internal/cli" --changed-files-json '["internal/cli/commands.go"]' --evidence-json '["go test ./internal/cli","docs/QUICKSTART.md updated"]'
 
 Bad usage:
 ptodo task update ABC-1 -s completed --summary "Done" --evidence-json "fixed it"
 ptodo task update ABC-1 --description '["docs written","tests passing"]'
 
 ### Subtasks
-ptodo subtask create <task-id> -t "Title" [-d "desc"] [-p 0-5] [--kind task|bug|feature|chore|spike] [--root-cause-analysis "why"] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
+ptodo subtask create <task-id> -t "Title" [-d "desc"] [-p 0-5] [--kind task|bug|feature|chore|spike] [--root-cause-analysis "why"] [--planned-files-json '["file.go"]'] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]']
 ptodo subtask list <task-id> [--limit <n>]
-ptodo subtask update <subtask-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-a <user-id>] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
+ptodo subtask update <subtask-id> [-t "Title"] [-d "desc"] [-p 0-5] [-s <status>] [-a <user-id>] [--changed-files-json '["file.go"]'] [--criteria-json '["criterion 1","criterion 2"]'] [--summary "completion summary"] [--evidence-json '["link-or-note"]']
 ptodo subtask delete <subtask-id>
 
 ### Comments

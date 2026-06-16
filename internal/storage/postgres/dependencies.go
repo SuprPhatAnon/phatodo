@@ -185,7 +185,7 @@ func (s *Store) loadTaskEdge(ctx context.Context, tx pgx.Tx, projectID string, t
 		}
 		return domain.TaskDetail{}, fmt.Errorf("load dependency task: %w", err)
 	}
-	return taskDetailFromSQLC(task)
+	return taskDetailFromGetTaskDetailRow(task)
 }
 
 func (s *Store) readDependencyTx(ctx context.Context, tx pgx.Tx, projectID string, taskID string, dependsOnID string) (domain.Dependency, error) {

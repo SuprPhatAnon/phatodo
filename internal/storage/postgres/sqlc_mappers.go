@@ -51,6 +51,202 @@ func taskDetailFromSQLC(row db.Task) (domain.TaskDetail, error) {
 			return domain.TaskDetail{}, err
 		}
 	}
+	if len(row.PlannedFiles) > 0 {
+		if err := json.Unmarshal(row.PlannedFiles, &task.PlannedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.ChangedFiles) > 0 {
+		if err := json.Unmarshal(row.ChangedFiles, &task.ChangedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.CompletionEvidence) > 0 {
+		if err := json.Unmarshal(row.CompletionEvidence, &task.CompletionEvidence); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	return task, nil
+}
+
+func taskDetailFromUpdateTaskRow(row db.UpdateTaskRow) (domain.TaskDetail, error) {
+	task := domain.TaskDetail{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		Kind:        domain.TaskKind(row.Kind),
+		Title:       row.Title,
+		Priority:    domain.Priority(row.Priority),
+		Status:      domain.Status(row.Status),
+		Tags:        row.Tags,
+	}
+	if row.EpicID != nil {
+		task.EpicID = *row.EpicID
+	}
+	if row.ParentTaskID != nil {
+		task.ParentTaskID = *row.ParentTaskID
+	}
+	if row.AssignedTo != nil {
+		task.AssignedTo = *row.AssignedTo
+	}
+	if row.CreatedBy != nil {
+		task.CreatedBy = *row.CreatedBy
+	}
+	if row.UpdatedBy != nil {
+		task.UpdatedBy = *row.UpdatedBy
+	}
+	if row.CompletedBy != nil {
+		task.CompletedBy = *row.CompletedBy
+	}
+	if row.Description != nil {
+		task.Description = *row.Description
+	}
+	task.RootCauseAnalysis = row.RootCauseAnalysis
+	if row.CompletionSummary != nil {
+		task.CompletionSummary = *row.CompletionSummary
+	}
+	if row.CompletedAt.Valid {
+		task.CompletedAt = row.CompletedAt.Time
+	}
+	if len(row.AcceptanceCriteria) > 0 {
+		if err := json.Unmarshal(row.AcceptanceCriteria, &task.AcceptanceCriteria); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.PlannedFiles) > 0 {
+		if err := json.Unmarshal(row.PlannedFiles, &task.PlannedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.ChangedFiles) > 0 {
+		if err := json.Unmarshal(row.ChangedFiles, &task.ChangedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.CompletionEvidence) > 0 {
+		if err := json.Unmarshal(row.CompletionEvidence, &task.CompletionEvidence); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	return task, nil
+}
+
+func taskDetailFromGetTaskDetailRow(row db.GetTaskDetailRow) (domain.TaskDetail, error) {
+	task := domain.TaskDetail{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		Kind:        domain.TaskKind(row.Kind),
+		Title:       row.Title,
+		Priority:    domain.Priority(row.Priority),
+		Status:      domain.Status(row.Status),
+		Tags:        row.Tags,
+	}
+	if row.EpicID != nil {
+		task.EpicID = *row.EpicID
+	}
+	if row.ParentTaskID != nil {
+		task.ParentTaskID = *row.ParentTaskID
+	}
+	if row.AssignedTo != nil {
+		task.AssignedTo = *row.AssignedTo
+	}
+	if row.CreatedBy != nil {
+		task.CreatedBy = *row.CreatedBy
+	}
+	if row.UpdatedBy != nil {
+		task.UpdatedBy = *row.UpdatedBy
+	}
+	if row.CompletedBy != nil {
+		task.CompletedBy = *row.CompletedBy
+	}
+	if row.Description != nil {
+		task.Description = *row.Description
+	}
+	task.RootCauseAnalysis = row.RootCauseAnalysis
+	if row.CompletionSummary != nil {
+		task.CompletionSummary = *row.CompletionSummary
+	}
+	if row.CompletedAt.Valid {
+		task.CompletedAt = row.CompletedAt.Time
+	}
+	if len(row.AcceptanceCriteria) > 0 {
+		if err := json.Unmarshal(row.AcceptanceCriteria, &task.AcceptanceCriteria); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.PlannedFiles) > 0 {
+		if err := json.Unmarshal(row.PlannedFiles, &task.PlannedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.ChangedFiles) > 0 {
+		if err := json.Unmarshal(row.ChangedFiles, &task.ChangedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.CompletionEvidence) > 0 {
+		if err := json.Unmarshal(row.CompletionEvidence, &task.CompletionEvidence); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	return task, nil
+}
+
+func taskDetailFromDeleteTaskRow(row db.DeleteTaskRow) (domain.TaskDetail, error) {
+	task := domain.TaskDetail{
+		ID:          row.ID,
+		WorkspaceID: row.WorkspaceID,
+		ProjectID:   row.ProjectID,
+		Kind:        domain.TaskKind(row.Kind),
+		Title:       row.Title,
+		Priority:    domain.Priority(row.Priority),
+		Status:      domain.Status(row.Status),
+		Tags:        row.Tags,
+	}
+	if row.EpicID != nil {
+		task.EpicID = *row.EpicID
+	}
+	if row.ParentTaskID != nil {
+		task.ParentTaskID = *row.ParentTaskID
+	}
+	if row.AssignedTo != nil {
+		task.AssignedTo = *row.AssignedTo
+	}
+	if row.CreatedBy != nil {
+		task.CreatedBy = *row.CreatedBy
+	}
+	if row.UpdatedBy != nil {
+		task.UpdatedBy = *row.UpdatedBy
+	}
+	if row.CompletedBy != nil {
+		task.CompletedBy = *row.CompletedBy
+	}
+	if row.Description != nil {
+		task.Description = *row.Description
+	}
+	task.RootCauseAnalysis = row.RootCauseAnalysis
+	if row.CompletionSummary != nil {
+		task.CompletionSummary = *row.CompletionSummary
+	}
+	if row.CompletedAt.Valid {
+		task.CompletedAt = row.CompletedAt.Time
+	}
+	if len(row.AcceptanceCriteria) > 0 {
+		if err := json.Unmarshal(row.AcceptanceCriteria, &task.AcceptanceCriteria); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.PlannedFiles) > 0 {
+		if err := json.Unmarshal(row.PlannedFiles, &task.PlannedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
+	if len(row.ChangedFiles) > 0 {
+		if err := json.Unmarshal(row.ChangedFiles, &task.ChangedFiles); err != nil {
+			return domain.TaskDetail{}, err
+		}
+	}
 	if len(row.CompletionEvidence) > 0 {
 		if err := json.Unmarshal(row.CompletionEvidence, &task.CompletionEvidence); err != nil {
 			return domain.TaskDetail{}, err

@@ -782,6 +782,7 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 		EpicID:             opts.epicID,
 		RootCauseAnalysis:  opts.rootCauseAnalysis,
 		Tags:               opts.tags,
+		PlannedFiles:       opts.plannedFiles,
 		AssignedTo:         opts.assignedTo,
 		AcceptanceCriteria: opts.acceptanceCriteria,
 	}
@@ -829,6 +830,7 @@ func runSubtaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 		Priority:           &priority,
 		AssignedTo:         opts.assignedTo,
 		RootCauseAnalysis:  opts.rootCauseAnalysis,
+		PlannedFiles:       opts.plannedFiles,
 		AcceptanceCriteria: opts.acceptanceCriteria,
 	}
 
@@ -973,6 +975,14 @@ func runTaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
 	if opts.hasRootCause {
 		req.RootCauseAnalysis = &opts.rootCause
 	}
+	if opts.hasChangedFilesJSON {
+		changedFiles, err := parseJSONStringList(opts.changedFilesJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.ChangedFiles = &changedFiles
+	}
 	if opts.hasCriteriaJSON {
 		criteria, err := parseJSONStringList(opts.criteriaJSON)
 		if err != nil {
@@ -1045,6 +1055,14 @@ func runSubtaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	if opts.hasAssignedTo {
 		req.AssignedTo = &opts.assignedTo
+	}
+	if opts.hasChangedFilesJSON {
+		changedFiles, err := parseJSONStringList(opts.changedFilesJSON)
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 2
+		}
+		req.ChangedFiles = &changedFiles
 	}
 	if opts.hasCriteriaJSON {
 		criteria, err := parseJSONStringList(opts.criteriaJSON)
@@ -1620,32 +1638,34 @@ func runTaskList(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 type taskUpdateOptions struct {
-	taskID          string
-	title           string
-	description     string
-	priority        int
-	status          string
-	kind            string
-	rootCause       string
-	tagsValue       string
-	epicID          string
-	noEpic          bool
-	assignedTo      string
-	criteriaJSON    string
-	summary         string
-	evidenceJSON    string
-	hasTitle        bool
-	hasDescription  bool
-	hasPriority     bool
-	hasStatus       bool
-	hasKind         bool
-	hasTags         bool
-	hasEpicID       bool
-	hasAssignedTo   bool
-	hasRootCause    bool
-	hasCriteriaJSON bool
-	hasSummary      bool
-	hasEvidenceJSON bool
+	taskID              string
+	title               string
+	description         string
+	priority            int
+	status              string
+	kind                string
+	rootCause           string
+	tagsValue           string
+	epicID              string
+	noEpic              bool
+	assignedTo          string
+	criteriaJSON        string
+	changedFilesJSON    string
+	summary             string
+	evidenceJSON        string
+	hasTitle            bool
+	hasDescription      bool
+	hasPriority         bool
+	hasStatus           bool
+	hasKind             bool
+	hasTags             bool
+	hasEpicID           bool
+	hasAssignedTo       bool
+	hasRootCause        bool
+	hasCriteriaJSON     bool
+	hasChangedFilesJSON bool
+	hasSummary          bool
+	hasEvidenceJSON     bool
 }
 
 func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
@@ -1671,6 +1691,7 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
 	fs.StringVar(&opts.rootCause, "root-cause", "", "")
 	fs.StringVar(&opts.rootCause, "root-cause-analysis", "", "")
+	fs.StringVar(&opts.changedFilesJSON, "changed-files-json", "", "")
 	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
 	fs.StringVar(&opts.summary, "summary", "", "")
 	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
@@ -1707,6 +1728,8 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 			opts.hasAssignedTo = true
 		case "root-cause", "root-cause-analysis":
 			opts.hasRootCause = true
+		case "changed-files-json":
+			opts.hasChangedFilesJSON = true
 		case "criteria-json":
 			opts.hasCriteriaJSON = true
 		case "summary":
@@ -1716,7 +1739,7 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 		}
 	})
 
-	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasKind && !opts.hasTags && !opts.hasEpicID && !opts.noEpic && !opts.hasAssignedTo && !opts.hasRootCause && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasKind && !opts.hasTags && !opts.hasEpicID && !opts.noEpic && !opts.hasAssignedTo && !opts.hasRootCause && !opts.hasChangedFilesJSON && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
 		return taskUpdateOptions{}, fmt.Errorf("task update requires at least one change flag")
 	}
 	if opts.noEpic && opts.hasEpicID {
@@ -1733,23 +1756,25 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 }
 
 type subtaskUpdateOptions struct {
-	taskID          string
-	title           string
-	description     string
-	priority        int
-	status          string
-	assignedTo      string
-	criteriaJSON    string
-	summary         string
-	evidenceJSON    string
-	hasTitle        bool
-	hasDescription  bool
-	hasPriority     bool
-	hasStatus       bool
-	hasAssignedTo   bool
-	hasCriteriaJSON bool
-	hasSummary      bool
-	hasEvidenceJSON bool
+	taskID              string
+	title               string
+	description         string
+	priority            int
+	status              string
+	assignedTo          string
+	criteriaJSON        string
+	changedFilesJSON    string
+	summary             string
+	evidenceJSON        string
+	hasTitle            bool
+	hasDescription      bool
+	hasPriority         bool
+	hasStatus           bool
+	hasAssignedTo       bool
+	hasCriteriaJSON     bool
+	hasChangedFilesJSON bool
+	hasSummary          bool
+	hasEvidenceJSON     bool
 }
 
 func parseSubtaskUpdateArgs(args []string) (subtaskUpdateOptions, error) {
@@ -1767,6 +1792,7 @@ func parseSubtaskUpdateArgs(args []string) (subtaskUpdateOptions, error) {
 	fs.StringVar(&opts.status, "status", "", "")
 	fs.StringVar(&opts.assignedTo, "a", "", "")
 	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
+	fs.StringVar(&opts.changedFilesJSON, "changed-files-json", "", "")
 	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
 	fs.StringVar(&opts.summary, "summary", "", "")
 	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
@@ -1795,6 +1821,8 @@ func parseSubtaskUpdateArgs(args []string) (subtaskUpdateOptions, error) {
 			opts.hasStatus = true
 		case "a", "assigned-to":
 			opts.hasAssignedTo = true
+		case "changed-files-json":
+			opts.hasChangedFilesJSON = true
 		case "criteria-json":
 			opts.hasCriteriaJSON = true
 		case "summary":
@@ -1804,7 +1832,7 @@ func parseSubtaskUpdateArgs(args []string) (subtaskUpdateOptions, error) {
 		}
 	})
 
-	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasAssignedTo && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasAssignedTo && !opts.hasChangedFilesJSON && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
 		return subtaskUpdateOptions{}, fmt.Errorf("subtask update requires at least one change flag")
 	}
 	if opts.hasStatus && !isAllowedTaskStatus(opts.status) {
@@ -2161,6 +2189,7 @@ type taskCreateOptions struct {
 	tags               []string
 	assignedTo         string
 	rootCauseAnalysis  string
+	plannedFiles       []string
 	acceptanceCriteria []string
 }
 
@@ -2176,6 +2205,7 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	var tagsValue string
 	var assignedTo string
 	var criteriaJSON string
+	var plannedFilesJSON string
 	var kind string
 	var rootCause string
 	priority := int(domain.PriorityMedium)
@@ -2195,6 +2225,7 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	fs.StringVar(&tagsValue, "tags", "", "")
 	fs.StringVar(&assignedTo, "a", "", "")
 	fs.StringVar(&assignedTo, "assigned-to", "", "")
+	fs.StringVar(&plannedFilesJSON, "planned-files-json", "", "")
 	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
 	fs.StringVar(&rootCause, "root-cause", "", "")
 	fs.StringVar(&rootCause, "root-cause-analysis", "", "")
@@ -2220,6 +2251,10 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	}
 
 	tags := parseCSVList(tagsValue)
+	plannedFiles, err := parseJSONStringList(plannedFilesJSON)
+	if err != nil {
+		return taskCreateOptions{}, err
+	}
 	criteria, err := parseJSONStringList(criteriaJSON)
 	if err != nil {
 		return taskCreateOptions{}, err
@@ -2235,6 +2270,7 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 		tags:               tags,
 		assignedTo:         assignedTo,
 		rootCauseAnalysis:  rootCause,
+		plannedFiles:       plannedFiles,
 		acceptanceCriteria: criteria,
 	}, nil
 }
@@ -2247,6 +2283,7 @@ type subtaskCreateOptions struct {
 	priority           int
 	rootCauseAnalysis  string
 	assignedTo         string
+	plannedFiles       []string
 	acceptanceCriteria []string
 }
 
@@ -2259,6 +2296,7 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 	var kind string
 	var rootCause string
 	var assignedTo string
+	var plannedFilesJSON string
 	var criteriaJSON string
 	priority := int(domain.PriorityMedium)
 
@@ -2272,6 +2310,7 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 	fs.IntVar(&priority, "priority", int(domain.PriorityMedium), "")
 	fs.StringVar(&assignedTo, "a", "", "")
 	fs.StringVar(&assignedTo, "assigned-to", "", "")
+	fs.StringVar(&plannedFilesJSON, "planned-files-json", "", "")
 	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
 	fs.StringVar(&rootCause, "root-cause", "", "")
 	fs.StringVar(&rootCause, "root-cause-analysis", "", "")
@@ -2296,6 +2335,10 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires --root-cause-analysis when kind is bug")
 	}
 
+	plannedFiles, err := parseJSONStringList(plannedFilesJSON)
+	if err != nil {
+		return subtaskCreateOptions{}, err
+	}
 	criteria, err := parseJSONStringList(criteriaJSON)
 	if err != nil {
 		return subtaskCreateOptions{}, err
@@ -2309,6 +2352,7 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 		priority:           priority,
 		assignedTo:         assignedTo,
 		rootCauseAnalysis:  rootCause,
+		plannedFiles:       plannedFiles,
 		acceptanceCriteria: criteria,
 	}, nil
 }

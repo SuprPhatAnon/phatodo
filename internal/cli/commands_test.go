@@ -1279,6 +1279,55 @@ func TestRunTaskCreateSendsFeatureKind(t *testing.T) {
 	require.Contains(t, stdout.String(), "kind: feature")
 }
 
+func TestRunTaskCreateSendsPlannedFiles(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createTaskFn: func(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, []string{"internal/cli/commands.go"}, req.PlannedFiles)
+				return domain.TaskCreateResponse{
+					ID:           "ABC-1",
+					IssuePrefix:  "ABC",
+					Title:        "Plan files",
+					Status:       domain.StatusTodo,
+					Priority:     domain.PriorityMedium,
+					ProjectID:    "default",
+					WorkspaceID:  "default",
+					Kind:         domain.TaskKindTask,
+					PlannedFiles: []string{"internal/cli/commands.go"},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "create", "-t", "Plan files", "--issue-prefix", "ABC", "--planned-files-json", `["internal/cli/commands.go"]`}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "plannedFiles[1]:")
+	require.Contains(t, stdout.String(), "- internal/cli/commands.go")
+}
+
 func TestRunSubtaskCreateCallsServer(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1559,6 +1608,58 @@ func TestRunTaskUpdateUsesFakeClient(t *testing.T) {
 	require.Contains(t, stdout.String(), "- id: ABC-1")
 	require.Contains(t, stdout.String(), "title: \"Updated docs\"")
 	require.Contains(t, stdout.String(), "status: in_progress")
+}
+
+func TestRunTaskUpdateSendsChangedFilesAndEvidence(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			updateTaskFn: func(ctx context.Context, projectID, taskID string, req domain.TaskUpdateRequest) (domain.TaskDetail, error) {
+				require.NotNil(t, req.Status)
+				require.Equal(t, domain.StatusCompleted, *req.Status)
+				require.NotNil(t, req.ChangedFiles)
+				require.Equal(t, []string{"internal/cli/commands.go"}, *req.ChangedFiles)
+				require.NotNil(t, req.CompletionEvidence)
+				require.Equal(t, []string{"go test ./internal/cli"}, *req.CompletionEvidence)
+				return domain.TaskDetail{
+					ID:                 "ABC-1",
+					Title:              "Updated docs",
+					Status:             domain.StatusCompleted,
+					Priority:           domain.PriorityHigh,
+					ChangedFiles:       []string{"internal/cli/commands.go"},
+					CompletionEvidence: []string{"go test ./internal/cli"},
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "update", "ABC-1", "-s", "completed", "--changed-files-json", `["internal/cli/commands.go"]`, "--evidence-json", `["go test ./internal/cli"]`}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "changedFiles[1]:")
+	require.Contains(t, stdout.String(), "- internal/cli/commands.go")
+	require.Contains(t, stdout.String(), "completionEvidence[1]:")
 }
 
 func TestRunSubtaskUpdateUsesFakeClient(t *testing.T) {

@@ -17,6 +17,8 @@ var ErrAssignedUserNotFound = errors.New("assigned user not found")
 var ErrInvalidIssuePrefix = errors.New("issue prefix is invalid")
 var ErrInvalidTaskKind = errors.New("invalid task kind")
 var ErrTaskKindRequiresRootCause = errors.New("root cause analysis is required for bug kind")
+var ErrTaskCompletionRequiresChangedFiles = errors.New("changed files are required before completing task")
+var ErrTaskCompletionRequiresEvidence = errors.New("completion evidence is required before completing task")
 var ErrTaskNotFound = errors.New("task not found")
 
 func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.TaskCreateRequest, actorUserID string) (domain.TaskCreateResponse, error) {
@@ -118,6 +120,11 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 	if err != nil {
 		return domain.TaskCreateResponse{}, fmt.Errorf("marshal acceptance criteria: %w", err)
 	}
+	plannedFiles := cleanStringList(req.PlannedFiles)
+	plannedFilesJSON, err := json.Marshal(plannedFiles)
+	if err != nil {
+		return domain.TaskCreateResponse{}, fmt.Errorf("marshal planned files: %w", err)
+	}
 
 	row, err := q.CreateTask(ctx, db.CreateTaskParams{
 		ID:                 taskID,
@@ -133,6 +140,7 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 		RootCauseAnalysis:  rootCause,
 		Priority:           int32(priority),
 		Tags:               tags,
+		PlannedFiles:       plannedFilesJSON,
 		AcceptanceCriteria: acceptanceCriteriaJSON,
 	})
 	if err != nil {
@@ -160,6 +168,7 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 			"epic_id":             req.EpicID,
 			"parent_task_id":      req.ParentTaskID,
 			"tags":                tags,
+			"planned_files":       plannedFiles,
 		},
 	}); err != nil {
 		return domain.TaskCreateResponse{}, err
@@ -170,15 +179,16 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 	}
 
 	return domain.TaskCreateResponse{
-		ID:          row.ID,
-		IssuePrefix: prefix,
-		Title:       row.Title,
-		Kind:        domain.TaskKind(row.Kind),
-		Status:      domain.Status(row.Status),
-		Priority:    domain.Priority(row.Priority),
-		RootCause:   row.RootCauseAnalysis,
-		ProjectID:   row.ProjectID,
-		WorkspaceID: row.WorkspaceID,
+		ID:           row.ID,
+		IssuePrefix:  prefix,
+		Title:        row.Title,
+		Kind:         domain.TaskKind(row.Kind),
+		Status:       domain.Status(row.Status),
+		Priority:     domain.Priority(row.Priority),
+		RootCause:    row.RootCauseAnalysis,
+		PlannedFiles: plannedFiles,
+		ProjectID:    row.ProjectID,
+		WorkspaceID:  row.WorkspaceID,
 	}, nil
 }
 
@@ -290,6 +300,27 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		return domain.TaskDetail{}, ErrTaskKindRequiresRootCause
 	}
 
+	resultStatus := before.Status
+	if req.Status != nil {
+		resultStatus = *req.Status
+	}
+	resultChangedFiles := before.ChangedFiles
+	if req.ChangedFiles != nil {
+		resultChangedFiles = cleanStringList(*req.ChangedFiles)
+	}
+	resultCompletionEvidence := before.CompletionEvidence
+	if req.CompletionEvidence != nil {
+		resultCompletionEvidence = cleanStringList(*req.CompletionEvidence)
+	}
+	if resultStatus == domain.StatusCompleted {
+		if len(resultChangedFiles) == 0 {
+			return domain.TaskDetail{}, ErrTaskCompletionRequiresChangedFiles
+		}
+		if len(resultCompletionEvidence) == 0 {
+			return domain.TaskDetail{}, ErrTaskCompletionRequiresEvidence
+		}
+	}
+
 	var title *string
 	if req.Title != nil {
 		title = req.Title
@@ -322,6 +353,14 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		value := strings.TrimSpace(*req.RootCauseAnalysis)
 		rootCause = &value
 	}
+	var changedFiles []byte
+	if req.ChangedFiles != nil {
+		changedFilesJSON, err := json.Marshal(resultChangedFiles)
+		if err != nil {
+			return domain.TaskDetail{}, fmt.Errorf("marshal changed files: %w", err)
+		}
+		changedFiles = changedFilesJSON
+	}
 	var epicID *string
 	if req.EpicID != nil {
 		epicID = req.EpicID
@@ -344,7 +383,7 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 	}
 	var completionEvidence []byte
 	if req.CompletionEvidence != nil {
-		evidenceJSON, err := json.Marshal(*req.CompletionEvidence)
+		evidenceJSON, err := json.Marshal(resultCompletionEvidence)
 		if err != nil {
 			return domain.TaskDetail{}, fmt.Errorf("marshal completion evidence: %w", err)
 		}
@@ -363,6 +402,7 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		ClearEpic:          req.NoEpic,
 		EpicID:             epicID,
 		AssignedTo:         assignedTo,
+		ChangedFiles:       changedFiles,
 		AcceptanceCriteria: acceptanceCriteria,
 		CompletionSummary:  completionSummary,
 		CompletionEvidence: completionEvidence,
@@ -376,7 +416,7 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		return domain.TaskDetail{}, fmt.Errorf("update task: %w", err)
 	}
 
-	after, err := taskDetailFromSQLC(updated)
+	after, err := taskDetailFromUpdateTaskRow(updated)
 	if err != nil {
 		return domain.TaskDetail{}, fmt.Errorf("decode updated task: %w", err)
 	}
@@ -458,7 +498,7 @@ func (s *Store) DeleteTask(ctx context.Context, projectID string, taskID string,
 		return domain.TaskDetail{}, fmt.Errorf("commit task delete: %w", err)
 	}
 
-	return taskDetailFromSQLC(taskRow)
+	return taskDetailFromDeleteTaskRow(taskRow)
 }
 
 func (s *Store) ListReadyTasks(ctx context.Context, projectID string, epicID string, limit int) (domain.ReadyListResponse, error) {
@@ -531,7 +571,7 @@ func (s *Store) readTaskDetail(ctx context.Context, projectID string, taskID str
 		}
 		return domain.TaskDetail{}, fmt.Errorf("load task detail: %w", err)
 	}
-	return taskDetailFromSQLC(task)
+	return taskDetailFromGetTaskDetailRow(task)
 }
 
 func (s *Store) readTaskDetailTx(ctx context.Context, tx pgx.Tx, projectID string, taskID string) (domain.TaskDetail, error) {
@@ -542,7 +582,7 @@ func (s *Store) readTaskDetailTx(ctx context.Context, tx pgx.Tx, projectID strin
 		}
 		return domain.TaskDetail{}, fmt.Errorf("load task detail: %w", err)
 	}
-	return taskDetailFromSQLC(task)
+	return taskDetailFromGetTaskDetailRow(task)
 }
 
 func isAllowedTaskKind(value domain.TaskKind) bool {
@@ -552,6 +592,19 @@ func isAllowedTaskKind(value domain.TaskKind) bool {
 	default:
 		return false
 	}
+}
+
+func cleanStringList(values []string) []string {
+	if len(values) == 0 {
+		return []string{}
+	}
+	cleaned := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			cleaned = append(cleaned, trimmed)
+		}
+	}
+	return cleaned
 }
 
 func taskEntityType(parentTaskID string) string {

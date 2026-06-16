@@ -32,6 +32,8 @@ The Trekker-compatible command surface is extended to cover schema-backed fields
 
 - `-a/--assigned-to` for task and epic ownership
 - `--criteria-json` for acceptance criteria
+- `--planned-files-json` for files expected to be touched at creation time
+- `--changed-files-json` for files actually touched at completion time
 - `--summary` and `--evidence-json` for completion metadata
 - `-k/--kind` for task kind
 - `--root-cause` / `--root-cause-analysis` for bug task root-cause capture

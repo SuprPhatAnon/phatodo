@@ -146,6 +146,9 @@ func writeTaskCreateResponse(w io.Writer, resp domain.TaskCreateResponse) {
 	if resp.RootCause != "" {
 		writeTOONField(w, 1, "rootCauseAnalysis", resp.RootCause)
 	}
+	if len(resp.PlannedFiles) > 0 {
+		writeTOONStringArray(w, 1, "plannedFiles", resp.PlannedFiles)
+	}
 	writeTOONIntField(w, 1, "priority", int(resp.Priority))
 	writeTOONField(w, 1, "project_id", resp.ProjectID)
 	writeTOONField(w, 1, "workspace_id", resp.WorkspaceID)
@@ -241,6 +244,12 @@ func writeTaskDetail(w io.Writer, item domain.TaskDetail) {
 	writeTOONField(w, 1, "status", string(item.Status))
 	if item.RootCauseAnalysis != "" {
 		writeTOONField(w, 1, "rootCauseAnalysis", item.RootCauseAnalysis)
+	}
+	if len(item.PlannedFiles) > 0 {
+		writeTOONStringArray(w, 1, "plannedFiles", item.PlannedFiles)
+	}
+	if len(item.ChangedFiles) > 0 {
+		writeTOONStringArray(w, 1, "changedFiles", item.ChangedFiles)
 	}
 	if item.EpicID != "" {
 		writeTOONField(w, 1, "epicId", item.EpicID)

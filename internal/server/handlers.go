@@ -844,6 +844,10 @@ func (a *app) updateTask(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusBadRequest, "invalid_task_kind", err.Error())
 		case errors.Is(err, postgres.ErrTaskKindRequiresRootCause):
 			respondError(w, http.StatusBadRequest, "root_cause_required", err.Error())
+		case errors.Is(err, postgres.ErrTaskCompletionRequiresChangedFiles):
+			respondError(w, http.StatusBadRequest, "changed_files_required", err.Error())
+		case errors.Is(err, postgres.ErrTaskCompletionRequiresEvidence):
+			respondError(w, http.StatusBadRequest, "completion_evidence_required", err.Error())
 		case errors.Is(err, postgres.ErrEpicNotFound):
 			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
 		case errors.Is(err, postgres.ErrAssignedUserNotFound):
@@ -1278,6 +1282,9 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 	if req.RootCauseAnalysis != nil && strings.TrimSpace(*req.RootCauseAnalysis) == "" {
 		return domain.TaskUpdateRequest{}, errors.New("root_cause_analysis cannot be empty")
 	}
+	if req.ChangedFiles != nil && len(cleanStringList(*req.ChangedFiles)) == 0 {
+		return domain.TaskUpdateRequest{}, errors.New("changed_files cannot be empty")
+	}
 	if req.Title == nil &&
 		req.Description == nil &&
 		req.Priority == nil &&
@@ -1286,6 +1293,7 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 		req.EpicID == nil &&
 		!req.NoEpic &&
 		req.AssignedTo == nil &&
+		req.ChangedFiles == nil &&
 		req.AcceptanceCriteria == nil &&
 		req.CompletionSummary == nil &&
 		req.CompletionEvidence == nil {
@@ -1295,6 +1303,19 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 		return domain.TaskUpdateRequest{}, errors.New("status must be todo, in_progress, completed, wont_fix, or archived")
 	}
 	return req, nil
+}
+
+func cleanStringList(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	items := make([]string, 0, len(values))
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
 
 func isAllowedTaskKind(value string) bool {
