@@ -51,6 +51,7 @@ type Task struct {
 	ID           string
 	WorkspaceID  string
 	ProjectID    string
+	Kind         TaskKind
 	EpicID       string
 	ParentTaskID string
 	Title        string
@@ -64,11 +65,13 @@ type Task struct {
 
 type TaskCreateRequest struct {
 	Title              string    `json:"title"`
+	Kind               TaskKind  `json:"kind"`
 	IssuePrefix        string    `json:"issue_prefix"`
 	ParentTaskID       string    `json:"parent_task_id,omitempty"`
 	Description        string    `json:"description"`
 	Priority           *Priority `json:"priority,omitempty"`
 	EpicID             string    `json:"epic_id"`
+	RootCauseAnalysis  string    `json:"root_cause_analysis,omitempty"`
 	Tags               []string  `json:"tags"`
 	AssignedTo         string    `json:"assigned_to"`
 	AcceptanceCriteria []string  `json:"acceptance_criteria"`
@@ -78,7 +81,9 @@ type TaskCreateResponse struct {
 	ID          string   `json:"id"`
 	IssuePrefix string   `json:"issue_prefix"`
 	Title       string   `json:"title"`
+	Kind        TaskKind `json:"kind"`
 	Status      Status   `json:"status"`
+	RootCause   string   `json:"root_cause_analysis,omitempty"`
 	Priority    Priority `json:"priority"`
 	ProjectID   string   `json:"project_id"`
 	WorkspaceID string   `json:"workspace_id"`
@@ -87,6 +92,7 @@ type TaskCreateResponse struct {
 type TaskListItem struct {
 	ID           string    `json:"id"`
 	Title        string    `json:"title"`
+	Kind         TaskKind  `json:"kind,omitempty"`
 	Description  string    `json:"description,omitempty"`
 	Status       Status    `json:"status"`
 	Priority     Priority  `json:"priority"`
@@ -106,6 +112,7 @@ type TaskDetail struct {
 	ID                 string    `json:"id"`
 	WorkspaceID        string    `json:"workspace_id,omitempty"`
 	ProjectID          string    `json:"project_id,omitempty"`
+	Kind               TaskKind  `json:"kind,omitempty"`
 	EpicID             string    `json:"epic_id,omitempty"`
 	ParentTaskID       string    `json:"parent_task_id,omitempty"`
 	AssignedTo         string    `json:"assigned_to,omitempty"`
@@ -120,6 +127,7 @@ type TaskDetail struct {
 	AcceptanceCriteria []string  `json:"acceptance_criteria,omitempty"`
 	CompletionEvidence []string  `json:"completion_evidence,omitempty"`
 	CompletionSummary  string    `json:"completion_summary,omitempty"`
+	RootCauseAnalysis  string    `json:"root_cause_analysis,omitempty"`
 	CompletedAt        time.Time `json:"completed_at,omitempty"`
 	CreatedAt          time.Time `json:"created_at,omitempty"`
 	UpdatedAt          time.Time `json:"updated_at,omitempty"`
@@ -128,16 +136,28 @@ type TaskDetail struct {
 type TaskUpdateRequest struct {
 	Title              *string   `json:"title,omitempty"`
 	Description        *string   `json:"description,omitempty"`
+	Kind               *TaskKind `json:"kind,omitempty"`
 	Priority           *Priority `json:"priority,omitempty"`
 	Status             *Status   `json:"status,omitempty"`
 	Tags               *[]string `json:"tags,omitempty"`
 	EpicID             *string   `json:"epic_id,omitempty"`
 	NoEpic             bool      `json:"no_epic,omitempty"`
 	AssignedTo         *string   `json:"assigned_to,omitempty"`
+	RootCauseAnalysis  *string   `json:"root_cause_analysis,omitempty"`
 	AcceptanceCriteria *[]string `json:"acceptance_criteria,omitempty"`
 	CompletionSummary  *string   `json:"completion_summary,omitempty"`
 	CompletionEvidence *[]string `json:"completion_evidence,omitempty"`
 }
+
+type TaskKind string
+
+const (
+	TaskKindTask    TaskKind = "task"
+	TaskKindBug     TaskKind = "bug"
+	TaskKindFeature TaskKind = "feature"
+	TaskKindChore   TaskKind = "chore"
+	TaskKindSpike   TaskKind = "spike"
+)
 
 type ReadyListItem struct {
 	ID           string         `json:"id"`

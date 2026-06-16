@@ -35,6 +35,8 @@ These fields may appear on epics, tasks, and subtasks depending on the command:
 - `epic_id`
 - `parent_task_id`
 - `tags`
+- `kind`
+- `root_cause_analysis`
 
 ### Comment fields
 
@@ -223,8 +225,10 @@ Optional input:
 - `-d <description>`
 - `-p <priority>`
 - `-e <epic-id>`
+- `-k <task|bug|feature|chore|spike>`
 - `--tags "a,b"`
 - `-a <user-id>`
+- `--root-cause-analysis <text>`
 - `--criteria-json '["..."]'`
 
 Server request:
@@ -239,6 +243,8 @@ Expected body fields:
 - `tags`
 - `assigned_to`
 - `acceptance_criteria`
+- `kind`
+- `root_cause_analysis`
 
 Response:
 - the created task row, including generated task ID and the normalized issue prefix used to create it
@@ -281,10 +287,12 @@ Optional input:
 - `-d <description>`
 - `-p <priority>`
 - `-s <status>`
+- `-k <task|bug|feature|chore|spike>`
 - `--tags "a,b"`
 - `-e <epic-id>`
 - `--no-epic`
 - `-a <user-id>`
+- `--root-cause-analysis <text>`
 - `--criteria-json '["..."]'`
 - `--summary <completion-summary>`
 - `--evidence-json '["..."]'`
@@ -312,6 +320,8 @@ Optional input:
 - `-d <description>`
 - `-p <priority>`
 - `-a <user-id>`
+- `-k <task|bug|feature|chore|spike>`
+- `--root-cause-analysis <text>`
 - `--criteria-json '["..."]'`
 
 Server request:

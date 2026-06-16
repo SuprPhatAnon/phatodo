@@ -28,7 +28,9 @@ spec:
               until pg_isready -d "$PHATODO_DATABASE_URL"; do
                 sleep 2
               done
-              psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -f /migrations/0001_initial.sql
+              for migration in /migrations/*.sql; do
+                psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+              done
           volumeMounts:
             - name: migrations
               mountPath: /migrations

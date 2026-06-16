@@ -15,9 +15,24 @@ import (
 var ErrEpicNotFound = errors.New("epic not found")
 var ErrAssignedUserNotFound = errors.New("assigned user not found")
 var ErrInvalidIssuePrefix = errors.New("issue prefix is invalid")
+var ErrInvalidTaskKind = errors.New("invalid task kind")
+var ErrTaskKindRequiresRootCause = errors.New("root cause analysis is required for bug kind")
 var ErrTaskNotFound = errors.New("task not found")
 
 func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.TaskCreateRequest, actorUserID string) (domain.TaskCreateResponse, error) {
+	kind := req.Kind
+	if kind == "" {
+		kind = domain.TaskKindTask
+	}
+	if !isAllowedTaskKind(kind) {
+		return domain.TaskCreateResponse{}, ErrInvalidTaskKind
+	}
+
+	rootCause := strings.TrimSpace(req.RootCauseAnalysis)
+	if kind == domain.TaskKindBug && rootCause == "" {
+		return domain.TaskCreateResponse{}, ErrTaskKindRequiresRootCause
+	}
+
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return domain.TaskCreateResponse{}, fmt.Errorf("begin task create tx: %w", err)
@@ -112,8 +127,10 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 		ParentTaskID:       req.ParentTaskID,
 		AssignedTo:         req.AssignedTo,
 		CreatedBy:          actorUserID,
+		Kind:               string(kind),
 		Title:              req.Title,
 		Description:        req.Description,
+		RootCauseAnalysis:  rootCause,
 		Priority:           int32(priority),
 		Tags:               tags,
 		AcceptanceCriteria: acceptanceCriteriaJSON,
@@ -131,16 +148,18 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 		ActorUserID: actorUserID,
 		ActorLabel:  actorUserID,
 		AfterState: map[string]any{
-			"id":             row.ID,
-			"issue_prefix":   prefix,
-			"title":          row.Title,
-			"priority":       row.Priority,
-			"status":         row.Status,
-			"project_id":     row.ProjectID,
-			"workspace_id":   row.WorkspaceID,
-			"epic_id":        req.EpicID,
-			"parent_task_id": req.ParentTaskID,
-			"tags":           tags,
+			"id":                  row.ID,
+			"issue_prefix":        prefix,
+			"title":               row.Title,
+			"kind":                row.Kind,
+			"priority":            row.Priority,
+			"status":              row.Status,
+			"root_cause_analysis": row.RootCauseAnalysis,
+			"project_id":          row.ProjectID,
+			"workspace_id":        row.WorkspaceID,
+			"epic_id":             req.EpicID,
+			"parent_task_id":      req.ParentTaskID,
+			"tags":                tags,
 		},
 	}); err != nil {
 		return domain.TaskCreateResponse{}, err
@@ -154,8 +173,10 @@ func (s *Store) CreateTask(ctx context.Context, projectID string, req domain.Tas
 		ID:          row.ID,
 		IssuePrefix: prefix,
 		Title:       row.Title,
+		Kind:        domain.TaskKind(row.Kind),
 		Status:      domain.Status(row.Status),
 		Priority:    domain.Priority(row.Priority),
+		RootCause:   row.RootCauseAnalysis,
 		ProjectID:   row.ProjectID,
 		WorkspaceID: row.WorkspaceID,
 	}, nil
@@ -197,6 +218,7 @@ func (s *Store) listTasks(ctx context.Context, projectID string, status string, 
 				Title:        row.Title,
 				Status:       row.Status,
 				Priority:     row.Priority,
+				Kind:         row.Kind,
 				EpicID:       row.EpicID,
 				ParentTaskID: row.ParentTaskID,
 				Tags:         row.Tags,
@@ -252,6 +274,22 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		return domain.TaskDetail{}, err
 	}
 
+	resultKind := before.Kind
+	if req.Kind != nil {
+		if !isAllowedTaskKind(*req.Kind) {
+			return domain.TaskDetail{}, ErrInvalidTaskKind
+		}
+		resultKind = *req.Kind
+	}
+
+	resultRootCause := before.RootCauseAnalysis
+	if req.RootCauseAnalysis != nil {
+		resultRootCause = strings.TrimSpace(*req.RootCauseAnalysis)
+	}
+	if resultKind == domain.TaskKindBug && resultRootCause == "" {
+		return domain.TaskDetail{}, ErrTaskKindRequiresRootCause
+	}
+
 	var title *string
 	if req.Title != nil {
 		title = req.Title
@@ -273,6 +311,16 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 	var tags []string
 	if req.Tags != nil {
 		tags = *req.Tags
+	}
+	var kind *string
+	if req.Kind != nil {
+		value := string(*req.Kind)
+		kind = &value
+	}
+	var rootCause *string
+	if req.RootCauseAnalysis != nil {
+		value := strings.TrimSpace(*req.RootCauseAnalysis)
+		rootCause = &value
 	}
 	var epicID *string
 	if req.EpicID != nil {
@@ -310,6 +358,8 @@ func (s *Store) UpdateTask(ctx context.Context, projectID string, taskID string,
 		Priority:           priority,
 		Status:             status,
 		Tags:               tags,
+		Kind:               kind,
+		RootCauseAnalysis:  rootCause,
 		ClearEpic:          req.NoEpic,
 		EpicID:             epicID,
 		AssignedTo:         assignedTo,
@@ -493,6 +543,15 @@ func (s *Store) readTaskDetailTx(ctx context.Context, tx pgx.Tx, projectID strin
 		return domain.TaskDetail{}, fmt.Errorf("load task detail: %w", err)
 	}
 	return taskDetailFromSQLC(task)
+}
+
+func isAllowedTaskKind(value domain.TaskKind) bool {
+	switch value {
+	case domain.TaskKindTask, domain.TaskKindBug, domain.TaskKindFeature, domain.TaskKindChore, domain.TaskKindSpike:
+		return true
+	default:
+		return false
+	}
 }
 
 func taskEntityType(parentTaskID string) string {

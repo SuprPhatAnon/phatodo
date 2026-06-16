@@ -40,18 +40,18 @@ SELECT counter FROM upserted;
 -- name: CreateTask :one
 INSERT INTO tasks (
 	id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, title, description, priority,
+	created_by, updated_by, title, description, kind, root_cause_analysis, priority,
 	status, tags, acceptance_criteria
 ) VALUES (
 	sqlc.arg(id), sqlc.arg(workspace_id), sqlc.arg(project_id), NULLIF(sqlc.arg(epic_id), ''),
 	NULLIF(sqlc.arg(parent_task_id), ''), NULLIF(sqlc.arg(assigned_to), ''),
-	NULLIF(sqlc.arg(created_by), ''), NULL, sqlc.arg(title), NULLIF(sqlc.arg(description), ''), sqlc.arg(priority),
+	NULLIF(sqlc.arg(created_by), ''), NULL, sqlc.arg(title), NULLIF(sqlc.arg(description), ''), sqlc.arg(kind), sqlc.arg(root_cause_analysis), sqlc.arg(priority),
 	'todo', sqlc.arg(tags), sqlc.arg(acceptance_criteria)::jsonb
 )
-RETURNING id, title, status, priority, project_id, workspace_id;
+RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis;
 
 -- name: ListTasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND parent_task_id IS NULL
@@ -60,7 +60,7 @@ WHERE project_id = sqlc.arg(project_id)
 ORDER BY priority ASC, created_at ASC, id ASC;
 
 -- name: ListSubtasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND parent_task_id = sqlc.arg(parent_task_id)
@@ -69,7 +69,7 @@ ORDER BY priority ASC, created_at ASC, id ASC;
 
 -- name: GetTaskDetail :one
 SELECT id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, completed_by, title, description, priority,
+	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
 	status, tags, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 FROM tasks
@@ -81,6 +81,8 @@ SET updated_by = sqlc.arg(updated_by),
 	updated_at = now(),
 	title = COALESCE(sqlc.narg(title), title),
 	description = COALESCE(sqlc.narg(description), description),
+	kind = COALESCE(sqlc.narg(kind), kind),
+	root_cause_analysis = COALESCE(sqlc.narg(root_cause_analysis), root_cause_analysis),
 	priority = COALESCE(sqlc.narg(priority), priority),
 	status = COALESCE(sqlc.narg(status), status),
 	tags = COALESCE(sqlc.narg(tags), tags),
@@ -106,7 +108,7 @@ RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
 -- name: DeleteTask :one
 DELETE FROM tasks
 WHERE project_id = sqlc.arg(project_id) AND id = sqlc.arg(task_id)
-RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
+RETURNING id, workspace_id, project_id, epic_id, parent_task_id, kind, root_cause_analysis, assigned_to,
 	created_by, updated_by, completed_by, title, description, priority,
 	status, tags, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at;

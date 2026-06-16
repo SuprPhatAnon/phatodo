@@ -775,10 +775,12 @@ func runTaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 	priority := domain.Priority(opts.priority)
 	req := domain.TaskCreateRequest{
 		Title:              opts.title,
+		Kind:               domain.TaskKind(opts.kind),
 		IssuePrefix:        opts.issuePrefix,
 		Description:        opts.description,
 		Priority:           &priority,
 		EpicID:             opts.epicID,
+		RootCauseAnalysis:  opts.rootCauseAnalysis,
 		Tags:               opts.tags,
 		AssignedTo:         opts.assignedTo,
 		AcceptanceCriteria: opts.acceptanceCriteria,
@@ -822,9 +824,11 @@ func runSubtaskCreate(args []string, stdout io.Writer, stderr io.Writer) int {
 	priority := domain.Priority(opts.priority)
 	req := domain.TaskCreateRequest{
 		Title:              opts.title,
+		Kind:               domain.TaskKind(opts.kind),
 		Description:        opts.description,
 		Priority:           &priority,
 		AssignedTo:         opts.assignedTo,
+		RootCauseAnalysis:  opts.rootCauseAnalysis,
 		AcceptanceCriteria: opts.acceptanceCriteria,
 	}
 
@@ -950,6 +954,10 @@ func runTaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
 		status := domain.Status(opts.status)
 		req.Status = &status
 	}
+	if opts.hasKind {
+		kind := domain.TaskKind(opts.kind)
+		req.Kind = &kind
+	}
 	if opts.hasTags {
 		tags := parseCSVList(opts.tagsValue)
 		req.Tags = &tags
@@ -961,6 +969,9 @@ func runTaskUpdate(args []string, stdout io.Writer, stderr io.Writer) int {
 	}
 	if opts.hasAssignedTo {
 		req.AssignedTo = &opts.assignedTo
+	}
+	if opts.hasRootCause {
+		req.RootCauseAnalysis = &opts.rootCause
 	}
 	if opts.hasCriteriaJSON {
 		criteria, err := parseJSONStringList(opts.criteriaJSON)
@@ -1614,6 +1625,8 @@ type taskUpdateOptions struct {
 	description     string
 	priority        int
 	status          string
+	kind            string
+	rootCause       string
 	tagsValue       string
 	epicID          string
 	noEpic          bool
@@ -1625,9 +1638,11 @@ type taskUpdateOptions struct {
 	hasDescription  bool
 	hasPriority     bool
 	hasStatus       bool
+	hasKind         bool
 	hasTags         bool
 	hasEpicID       bool
 	hasAssignedTo   bool
+	hasRootCause    bool
 	hasCriteriaJSON bool
 	hasSummary      bool
 	hasEvidenceJSON bool
@@ -1646,12 +1661,16 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 	fs.IntVar(&opts.priority, "priority", int(domain.PriorityMedium), "")
 	fs.StringVar(&opts.status, "s", "", "")
 	fs.StringVar(&opts.status, "status", "", "")
+	fs.StringVar(&opts.kind, "k", "", "")
+	fs.StringVar(&opts.kind, "kind", "", "")
 	fs.StringVar(&opts.tagsValue, "tags", "", "")
 	fs.StringVar(&opts.epicID, "e", "", "")
 	fs.StringVar(&opts.epicID, "epic", "", "")
 	fs.BoolVar(&opts.noEpic, "no-epic", false, "")
 	fs.StringVar(&opts.assignedTo, "a", "", "")
 	fs.StringVar(&opts.assignedTo, "assigned-to", "", "")
+	fs.StringVar(&opts.rootCause, "root-cause", "", "")
+	fs.StringVar(&opts.rootCause, "root-cause-analysis", "", "")
 	fs.StringVar(&opts.criteriaJSON, "criteria-json", "", "")
 	fs.StringVar(&opts.summary, "summary", "", "")
 	fs.StringVar(&opts.evidenceJSON, "evidence-json", "", "")
@@ -1678,12 +1697,16 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 			opts.hasPriority = true
 		case "s", "status":
 			opts.hasStatus = true
+		case "k", "kind":
+			opts.hasKind = true
 		case "tags":
 			opts.hasTags = true
 		case "e", "epic":
 			opts.hasEpicID = true
 		case "a", "assigned-to":
 			opts.hasAssignedTo = true
+		case "root-cause", "root-cause-analysis":
+			opts.hasRootCause = true
 		case "criteria-json":
 			opts.hasCriteriaJSON = true
 		case "summary":
@@ -1693,7 +1716,7 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 		}
 	})
 
-	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasTags && !opts.hasEpicID && !opts.noEpic && !opts.hasAssignedTo && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
+	if !opts.hasTitle && !opts.hasDescription && !opts.hasPriority && !opts.hasStatus && !opts.hasKind && !opts.hasTags && !opts.hasEpicID && !opts.noEpic && !opts.hasAssignedTo && !opts.hasRootCause && !opts.hasCriteriaJSON && !opts.hasSummary && !opts.hasEvidenceJSON {
 		return taskUpdateOptions{}, fmt.Errorf("task update requires at least one change flag")
 	}
 	if opts.noEpic && opts.hasEpicID {
@@ -1701,6 +1724,9 @@ func parseTaskUpdateArgs(args []string) (taskUpdateOptions, error) {
 	}
 	if opts.hasStatus && !isAllowedTaskStatus(opts.status) {
 		return taskUpdateOptions{}, fmt.Errorf("task update status must be todo, in_progress, completed, wont_fix, or archived")
+	}
+	if opts.hasKind && !isAllowedTaskKind(opts.kind) {
+		return taskUpdateOptions{}, fmt.Errorf("task update kind must be task, bug, feature, chore, or spike")
 	}
 
 	return opts, nil
@@ -2129,10 +2155,12 @@ type taskCreateOptions struct {
 	title              string
 	issuePrefix        string
 	description        string
+	kind               string
 	priority           int
 	epicID             string
 	tags               []string
 	assignedTo         string
+	rootCauseAnalysis  string
 	acceptanceCriteria []string
 }
 
@@ -2148,6 +2176,8 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	var tagsValue string
 	var assignedTo string
 	var criteriaJSON string
+	var kind string
+	var rootCause string
 	priority := int(domain.PriorityMedium)
 
 	fs.StringVar(&title, "t", "", "")
@@ -2156,6 +2186,8 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	fs.StringVar(&issuePrefixLong, "issue-prefix", "", "")
 	fs.StringVar(&description, "d", "", "")
 	fs.StringVar(&description, "description", "", "")
+	fs.StringVar(&kind, "k", string(domain.TaskKindTask), "")
+	fs.StringVar(&kind, "kind", string(domain.TaskKindTask), "")
 	fs.IntVar(&priority, "p", int(domain.PriorityMedium), "")
 	fs.IntVar(&priority, "priority", int(domain.PriorityMedium), "")
 	fs.StringVar(&epicID, "e", "", "")
@@ -2164,6 +2196,8 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	fs.StringVar(&assignedTo, "a", "", "")
 	fs.StringVar(&assignedTo, "assigned-to", "", "")
 	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
+	fs.StringVar(&rootCause, "root-cause", "", "")
+	fs.StringVar(&rootCause, "root-cause-analysis", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		return taskCreateOptions{}, fmt.Errorf("invalid task create flags: %w", err)
@@ -2178,6 +2212,12 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 	if issuePrefix == "" {
 		return taskCreateOptions{}, fmt.Errorf("task create requires --prefix <prefix>")
 	}
+	if !isAllowedTaskKind(kind) {
+		return taskCreateOptions{}, fmt.Errorf("task create kind must be task, bug, feature, chore, or spike")
+	}
+	if kind == string(domain.TaskKindBug) && strings.TrimSpace(rootCause) == "" {
+		return taskCreateOptions{}, fmt.Errorf("task create requires --root-cause-analysis when kind is bug")
+	}
 
 	tags := parseCSVList(tagsValue)
 	criteria, err := parseJSONStringList(criteriaJSON)
@@ -2189,10 +2229,12 @@ func parseTaskCreateArgs(args []string) (taskCreateOptions, error) {
 		title:              title,
 		issuePrefix:        issuePrefix,
 		description:        description,
+		kind:               kind,
 		priority:           priority,
 		epicID:             epicID,
 		tags:               tags,
 		assignedTo:         assignedTo,
+		rootCauseAnalysis:  rootCause,
 		acceptanceCriteria: criteria,
 	}, nil
 }
@@ -2201,7 +2243,9 @@ type subtaskCreateOptions struct {
 	taskID             string
 	title              string
 	description        string
+	kind               string
 	priority           int
+	rootCauseAnalysis  string
 	assignedTo         string
 	acceptanceCriteria []string
 }
@@ -2212,6 +2256,8 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 
 	var title string
 	var description string
+	var kind string
+	var rootCause string
 	var assignedTo string
 	var criteriaJSON string
 	priority := int(domain.PriorityMedium)
@@ -2220,11 +2266,15 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 	fs.StringVar(&title, "title", "", "")
 	fs.StringVar(&description, "d", "", "")
 	fs.StringVar(&description, "description", "", "")
+	fs.StringVar(&kind, "k", string(domain.TaskKindTask), "")
+	fs.StringVar(&kind, "kind", string(domain.TaskKindTask), "")
 	fs.IntVar(&priority, "p", int(domain.PriorityMedium), "")
 	fs.IntVar(&priority, "priority", int(domain.PriorityMedium), "")
 	fs.StringVar(&assignedTo, "a", "", "")
 	fs.StringVar(&assignedTo, "assigned-to", "", "")
 	fs.StringVar(&criteriaJSON, "criteria-json", "", "")
+	fs.StringVar(&rootCause, "root-cause", "", "")
+	fs.StringVar(&rootCause, "root-cause-analysis", "", "")
 
 	if len(args) == 0 {
 		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires <task-id>")
@@ -2239,6 +2289,12 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 	if title == "" {
 		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires -t <title>")
 	}
+	if !isAllowedTaskKind(kind) {
+		return subtaskCreateOptions{}, fmt.Errorf("subtask create kind must be task, bug, feature, chore, or spike")
+	}
+	if kind == string(domain.TaskKindBug) && strings.TrimSpace(rootCause) == "" {
+		return subtaskCreateOptions{}, fmt.Errorf("subtask create requires --root-cause-analysis when kind is bug")
+	}
 
 	criteria, err := parseJSONStringList(criteriaJSON)
 	if err != nil {
@@ -2249,8 +2305,10 @@ func parseSubtaskCreateArgs(args []string) (subtaskCreateOptions, error) {
 		taskID:             taskID,
 		title:              title,
 		description:        description,
+		kind:               kind,
 		priority:           priority,
 		assignedTo:         assignedTo,
+		rootCauseAnalysis:  rootCause,
 		acceptanceCriteria: criteria,
 	}, nil
 }
@@ -2283,6 +2341,15 @@ func parseJSONStringList(value string) ([]string, error) {
 func isAllowedTaskStatus(value string) bool {
 	switch domain.Status(value) {
 	case domain.StatusTodo, domain.StatusInProgress, domain.StatusCompleted, domain.StatusWontFix, domain.StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedTaskKind(value string) bool {
+	switch domain.TaskKind(strings.TrimSpace(value)) {
+	case domain.TaskKindTask, domain.TaskKindBug, domain.TaskKindFeature, domain.TaskKindChore, domain.TaskKindSpike:
 		return true
 	default:
 		return false

@@ -37,7 +37,7 @@ Initial route groups:
 
 Most handlers now return structured JSON from the Postgres-backed store. The config routes, admin bootstrap routes, epic routes, task create/list/show/update/delete routes, subtask create/list routes, comment routes, dependency routes, lock routes, and the ready/search/history/list routes are wired end to end. This lets the CLI and tests stabilize around URL shape while any remaining command surface is filled in.
 
-Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, comment kind, and audit metadata.
+Resource payloads will include accountability fields from the schema, including assignment, creator, updater, completion owner, acceptance criteria, completion evidence, completion timestamps, task kind, root-cause analysis, comment kind, and audit metadata.
 
 The config route returns a project-scoped list of `{key, value}` entries for `config list`, the ready route returns top-level todo tasks ordered by priority plus any tasks they would unblock, and the lock route family exposes time-bound leases on epics, tasks, and subtasks.
 

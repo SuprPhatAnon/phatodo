@@ -123,6 +123,8 @@ type Task struct {
 	CompletedBy        *string            `json:"completed_by"`
 	Title              string             `json:"title"`
 	Description        *string            `json:"description"`
+	Kind               string             `json:"kind"`
+	RootCauseAnalysis  string             `json:"root_cause_analysis"`
 	Priority           int32              `json:"priority"`
 	Status             string             `json:"status"`
 	Tags               []string           `json:"tags"`

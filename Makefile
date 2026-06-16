@@ -95,7 +95,7 @@ deploy: deploy-k3s
 
 deploy-k3s:
 	kubectl create namespace $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
-	kubectl create configmap phatodo-migrations --from-file=0001_initial.sql=migrations/0001_initial.sql -n $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create configmap phatodo-migrations --from-file=migrations/ -n $(KUBE_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
 	kubectl delete job phatodo-migrate -n $(KUBE_NAMESPACE) --ignore-not-found
 	kubectl apply -k $(K3S_DIR) -n $(KUBE_NAMESPACE)
 	kubectl wait --for=condition=complete job/phatodo-migrate -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)

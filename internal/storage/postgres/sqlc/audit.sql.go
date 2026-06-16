@@ -170,7 +170,7 @@ func (q *Queries) InsertEvent(ctx context.Context, arg InsertEventParams) error 
 }
 
 const listTasksUnified = `-- name: ListTasksUnified :many
-SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, COALESCE(description, ''), status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND ($2 = '' OR status = $2)
@@ -188,6 +188,7 @@ type ListTasksUnifiedRow struct {
 	Description  string    `json:"description"`
 	Status       string    `json:"status"`
 	Priority     int32     `json:"priority"`
+	Kind         string    `json:"kind"`
 	EpicID       *string   `json:"epic_id"`
 	ParentTaskID *string   `json:"parent_task_id"`
 	Tags         []string  `json:"tags"`
@@ -210,6 +211,7 @@ func (q *Queries) ListTasksUnified(ctx context.Context, arg ListTasksUnifiedPara
 			&i.Description,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
@@ -340,7 +342,7 @@ func (q *Queries) SearchEpics(ctx context.Context, arg SearchEpicsParams) ([]Sea
 }
 
 const searchTasks = `-- name: SearchTasks :many
-SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, created_at, updated_at
+SELECT id, title, COALESCE(description, ''), status, priority, kind, epic_id, parent_task_id, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND ($2 = '' OR status = $2)
@@ -364,6 +366,7 @@ type SearchTasksRow struct {
 	Description  string    `json:"description"`
 	Status       string    `json:"status"`
 	Priority     int32     `json:"priority"`
+	Kind         string    `json:"kind"`
 	EpicID       *string   `json:"epic_id"`
 	ParentTaskID *string   `json:"parent_task_id"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -385,6 +388,7 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Sea
 			&i.Description,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.CreatedAt,

@@ -138,8 +138,14 @@ func writeProjectConfigItem(w io.Writer, item ProjectConfigItem) {
 func writeTaskCreateResponse(w io.Writer, resp domain.TaskCreateResponse) {
 	writeTOONListItemStart(w, 0, "id", resp.ID)
 	writeTOONField(w, 1, "issue_prefix", resp.IssuePrefix)
+	if resp.Kind != "" {
+		writeTOONField(w, 1, "kind", string(resp.Kind))
+	}
 	writeTOONField(w, 1, "title", resp.Title)
 	writeTOONField(w, 1, "status", string(resp.Status))
+	if resp.RootCause != "" {
+		writeTOONField(w, 1, "rootCauseAnalysis", resp.RootCause)
+	}
 	writeTOONIntField(w, 1, "priority", int(resp.Priority))
 	writeTOONField(w, 1, "project_id", resp.ProjectID)
 	writeTOONField(w, 1, "workspace_id", resp.WorkspaceID)
@@ -155,6 +161,9 @@ func writeTOONTimeField(w io.Writer, indent int, key string, value time.Time) {
 func writeTaskListItem(w io.Writer, indent int, item domain.TaskListItem) {
 	writeTOONListItemStart(w, indent, "id", item.ID)
 	writeTOONField(w, indent+1, "title", item.Title)
+	if item.Kind != "" {
+		writeTOONField(w, indent+1, "kind", string(item.Kind))
+	}
 	writeTOONField(w, indent+1, "description", item.Description)
 	writeTOONIntField(w, indent+1, "priority", int(item.Priority))
 	writeTOONField(w, indent+1, "status", string(item.Status))
@@ -223,10 +232,16 @@ func writeReadyHumanItem(w io.Writer, item domain.ReadyListItem, indent int) {
 
 func writeTaskDetail(w io.Writer, item domain.TaskDetail) {
 	writeTOONListItemStart(w, 0, "id", item.ID)
+	if item.Kind != "" {
+		writeTOONField(w, 1, "kind", string(item.Kind))
+	}
 	writeTOONField(w, 1, "title", item.Title)
 	writeTOONField(w, 1, "description", item.Description)
 	writeTOONIntField(w, 1, "priority", int(item.Priority))
 	writeTOONField(w, 1, "status", string(item.Status))
+	if item.RootCauseAnalysis != "" {
+		writeTOONField(w, 1, "rootCauseAnalysis", item.RootCauseAnalysis)
+	}
 	if item.EpicID != "" {
 		writeTOONField(w, 1, "epicId", item.EpicID)
 	}

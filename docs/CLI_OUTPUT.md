@@ -71,8 +71,11 @@ Render:
 
 ```text
 - id: ABC-1
+  kind: task
   issue_prefix: ABC
   title: "Write docs"
+  status: todo
+  priority: 2
 ```
 
 `ptodo task list --status in_progress --epic epic-1 --limit 20`:
@@ -80,6 +83,7 @@ Render:
 ```text
 tasks[1]:
   - id: ABC-1
+    kind: task
     title: "Write docs"
     description: ""
     priority: 2

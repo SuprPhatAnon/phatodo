@@ -21,7 +21,7 @@ WHERE project_id = sqlc.arg(project_id)
 ORDER BY created_at DESC, id ASC;
 
 -- name: SearchTasks :many
-SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, created_at, updated_at
+SELECT id, title, COALESCE(description, ''), status, priority, kind, epic_id, parent_task_id, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND (sqlc.arg(status) = '' OR status = sqlc.arg(status))
@@ -45,7 +45,7 @@ WHERE project_id = sqlc.arg(project_id)
 ORDER BY created_at DESC, id ASC;
 
 -- name: ListTasksUnified :many
-SELECT id, title, COALESCE(description, ''), status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, COALESCE(description, ''), status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = sqlc.arg(project_id)
   AND (sqlc.arg(status) = '' OR status = sqlc.arg(status))

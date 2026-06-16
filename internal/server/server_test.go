@@ -36,6 +36,32 @@ func TestAPIRoutesRequireCredentials(t *testing.T) {
 	}
 }
 
+func TestDecodeTaskCreateRequestDefaultsKindAndRejectsBugWithoutRootCause(t *testing.T) {
+	req, err := decodeTaskCreateRequest(strings.NewReader(`{"title":"Write docs","issue_prefix":"ABC"}`))
+	require.NoError(t, err)
+	require.Equal(t, domain.TaskKindTask, req.Kind)
+
+	req, err = decodeTaskCreateRequest(strings.NewReader(`{"title":"Add import","issue_prefix":"ABC","kind":"feature"}`))
+	require.NoError(t, err)
+	require.Equal(t, domain.TaskKindFeature, req.Kind)
+
+	_, err = decodeTaskCreateRequest(strings.NewReader(`{"title":"Write docs","issue_prefix":"ABC","kind":"bug"}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "root_cause_analysis is required when kind is bug")
+}
+
+func TestDecodeSubtaskCreateRequestRejectsBugWithoutRootCause(t *testing.T) {
+	_, err := decodeSubtaskCreateRequest(strings.NewReader(`{"title":"Write docs","kind":"bug"}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "root_cause_analysis is required when kind is bug")
+}
+
+func TestDecodeTaskUpdateRequestValidatesRootCauseAnalysisEmpty(t *testing.T) {
+	_, err := decodeTaskUpdateRequest(strings.NewReader(`{"root_cause_analysis":"   "}`))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "root_cause_analysis cannot be empty")
+}
+
 func TestEpicListReturnsUnavailableWithoutStore(t *testing.T) {
 	handler := newApp(Config{}).routes()
 

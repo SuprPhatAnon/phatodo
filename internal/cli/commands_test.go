@@ -1079,6 +1079,8 @@ func TestRunTaskCreateCallsServer(t *testing.T) {
 					Priority:    domain.PriorityMedium,
 					ProjectID:   "default",
 					WorkspaceID: "default",
+					Kind:        domain.TaskKindBug,
+					RootCause:   "missing stack traces",
 				}, nil
 			},
 		}, nil
@@ -1128,6 +1130,8 @@ func TestRunTaskCreateAcceptsPrefixAlias(t *testing.T) {
 					Priority:    domain.PriorityMedium,
 					ProjectID:   "default",
 					WorkspaceID: "default",
+					Kind:        domain.TaskKindBug,
+					RootCause:   "timeout race",
 				}, nil
 			},
 		}, nil
@@ -1147,6 +1151,132 @@ func TestRunTaskCreateAcceptsPrefixAlias(t *testing.T) {
 	code := Run([]string{"--toon", "task", "create", "-t", "Write docs", "--prefix", "ABC"}, &stdout, &stderr)
 	require.Equal(t, 0, code, stderr.String())
 	require.Contains(t, stdout.String(), "- id: ABC-1")
+}
+
+func TestRunTaskCreateRejectsBugWithoutRootCause(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--kind", "bug"}, &stdout, &stderr)
+	require.Equal(t, 2, code, stderr.String())
+	require.Contains(t, stderr.String(), "root-cause-analysis")
+}
+
+func TestRunTaskCreateSendsKindAndRootCause(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createTaskFn: func(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, domain.TaskKindBug, req.Kind)
+				require.Equal(t, "missing stack traces", req.RootCauseAnalysis)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-1",
+					IssuePrefix: "ABC",
+					Title:       "Write docs",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+					Kind:        domain.TaskKindBug,
+					RootCause:   "missing stack traces",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "create", "-t", "Write docs", "--issue-prefix", "ABC", "--kind", "bug", "--root-cause-analysis", "missing stack traces"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "- id: ABC-1")
+	require.Contains(t, stdout.String(), "kind: bug")
+	require.Contains(t, stdout.String(), `rootCauseAnalysis: "missing stack traces"`)
+}
+
+func TestRunTaskCreateSendsFeatureKind(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createTaskFn: func(ctx context.Context, projectID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, domain.TaskKindFeature, req.Kind)
+				require.Empty(t, req.RootCauseAnalysis)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-1",
+					IssuePrefix: "ABC",
+					Title:       "Add import",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+					Kind:        domain.TaskKindFeature,
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "task", "create", "-t", "Add import", "--issue-prefix", "ABC", "--kind", "feature"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "kind: feature")
 }
 
 func TestRunSubtaskCreateCallsServer(t *testing.T) {
@@ -1178,6 +1308,8 @@ func TestRunSubtaskCreateCallsServer(t *testing.T) {
 					Priority:    domain.PriorityMedium,
 					ProjectID:   "default",
 					WorkspaceID: "default",
+					Kind:        domain.TaskKindBug,
+					RootCause:   "timeout race",
 				}, nil
 			},
 		}, nil
@@ -1199,6 +1331,84 @@ func TestRunSubtaskCreateCallsServer(t *testing.T) {
 	require.Contains(t, stdout.String(), "- id: ABC-2")
 	require.Contains(t, stdout.String(), "issue_prefix: ABC")
 	require.Contains(t, stdout.String(), "title: \"Write docs\"")
+}
+
+func TestRunSubtaskCreateRejectsBugWithoutRootCause(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "subtask", "create", "ABC-1", "-t", "Write docs", "--kind", "bug"}, &stdout, &stderr)
+	require.Equal(t, 2, code, stderr.String())
+	require.Contains(t, stderr.String(), "root-cause-analysis")
+}
+
+func TestRunSubtaskCreateSendsKindAndRootCause(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	workdir := filepath.Join(t.TempDir(), "phatodo")
+	require.NoError(t, os.MkdirAll(workdir, 0o755))
+	oldwd, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(oldwd))
+	})
+	require.NoError(t, os.Chdir(workdir))
+
+	oldFactory := newAPIClient
+	newAPIClient = func(cfg config.LocalConfig) (apiClient, error) {
+		return &fakeAPIClient{
+			createSubtaskFn: func(ctx context.Context, projectID, taskID string, req domain.TaskCreateRequest) (domain.TaskCreateResponse, error) {
+				require.Equal(t, "ABC-1", taskID)
+				require.Equal(t, domain.TaskKindBug, req.Kind)
+				require.Equal(t, "timeout race", req.RootCauseAnalysis)
+				return domain.TaskCreateResponse{
+					ID:          "ABC-2",
+					IssuePrefix: "ABC",
+					Title:       "Write docs",
+					Status:      domain.StatusTodo,
+					Priority:    domain.PriorityMedium,
+					ProjectID:   "default",
+					WorkspaceID: "default",
+					Kind:        domain.TaskKindBug,
+					RootCause:   "timeout race",
+				}, nil
+			},
+		}, nil
+	}
+	t.Cleanup(func() { newAPIClient = oldFactory })
+
+	cfg := config.LocalConfig{
+		APIURL:       "http://example.invalid",
+		WorkspaceID:  "default",
+		ProjectID:    "default",
+		AccessKey:    "key",
+		AccessSecret: "secret",
+	}
+	_, err = config.WriteLocal(workdir, cfg)
+	require.NoError(t, err)
+
+	code := Run([]string{"--toon", "subtask", "create", "ABC-1", "-t", "Write docs", "--kind", "bug", "--root-cause", "timeout race"}, &stdout, &stderr)
+	require.Equal(t, 0, code, stderr.String())
+	require.Contains(t, stdout.String(), "kind: bug")
+	require.Contains(t, stdout.String(), `rootCauseAnalysis: "timeout race"`)
 }
 
 func TestRunTaskShowUsesFakeClient(t *testing.T) {

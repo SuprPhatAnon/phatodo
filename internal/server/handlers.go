@@ -327,6 +327,10 @@ func (a *app) createTask(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
 		case errors.Is(err, postgres.ErrEpicNotFound):
 			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidTaskKind):
+			respondError(w, http.StatusBadRequest, "invalid_task_kind", err.Error())
+		case errors.Is(err, postgres.ErrTaskKindRequiresRootCause):
+			respondError(w, http.StatusBadRequest, "root_cause_required", err.Error())
 		case errors.Is(err, postgres.ErrAssignedUserNotFound):
 			respondError(w, http.StatusNotFound, "assigned_user_not_found", err.Error())
 		case errors.Is(err, postgres.ErrInvalidIssuePrefix):
@@ -365,6 +369,10 @@ func (a *app) createSubtask(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
 		case errors.Is(err, postgres.ErrEpicNotFound):
 			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidTaskKind):
+			respondError(w, http.StatusBadRequest, "invalid_task_kind", err.Error())
+		case errors.Is(err, postgres.ErrTaskKindRequiresRootCause):
+			respondError(w, http.StatusBadRequest, "root_cause_required", err.Error())
 		case errors.Is(err, postgres.ErrAssignedUserNotFound):
 			respondError(w, http.StatusNotFound, "assigned_user_not_found", err.Error())
 		case errors.Is(err, postgres.ErrInvalidIssuePrefix):
@@ -832,6 +840,10 @@ func (a *app) updateTask(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusNotFound, "project_not_found", err.Error())
 		case errors.Is(err, postgres.ErrTaskNotFound):
 			respondError(w, http.StatusNotFound, "task_not_found", err.Error())
+		case errors.Is(err, postgres.ErrInvalidTaskKind):
+			respondError(w, http.StatusBadRequest, "invalid_task_kind", err.Error())
+		case errors.Is(err, postgres.ErrTaskKindRequiresRootCause):
+			respondError(w, http.StatusBadRequest, "root_cause_required", err.Error())
 		case errors.Is(err, postgres.ErrEpicNotFound):
 			respondError(w, http.StatusNotFound, "epic_not_found", err.Error())
 		case errors.Is(err, postgres.ErrAssignedUserNotFound):
@@ -1129,6 +1141,15 @@ func decodeTaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error) {
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return domain.TaskCreateRequest{}, err
 	}
+	if req.Kind == "" {
+		req.Kind = domain.TaskKindTask
+	}
+	if !isAllowedTaskKind(string(req.Kind)) {
+		return domain.TaskCreateRequest{}, errors.New("kind must be task, bug, feature, chore, or spike")
+	}
+	if req.Kind == domain.TaskKindBug && strings.TrimSpace(req.RootCauseAnalysis) == "" {
+		return domain.TaskCreateRequest{}, errors.New("root_cause_analysis is required when kind is bug")
+	}
 	if req.Title == "" {
 		return domain.TaskCreateRequest{}, errors.New("title is required")
 	}
@@ -1142,6 +1163,15 @@ func decodeSubtaskCreateRequest(body io.Reader) (domain.TaskCreateRequest, error
 	var req domain.TaskCreateRequest
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return domain.TaskCreateRequest{}, err
+	}
+	if req.Kind == "" {
+		req.Kind = domain.TaskKindTask
+	}
+	if !isAllowedTaskKind(string(req.Kind)) {
+		return domain.TaskCreateRequest{}, errors.New("kind must be task, bug, feature, chore, or spike")
+	}
+	if req.Kind == domain.TaskKindBug && strings.TrimSpace(req.RootCauseAnalysis) == "" {
+		return domain.TaskCreateRequest{}, errors.New("root_cause_analysis is required when kind is bug")
 	}
 	if req.Title == "" {
 		return domain.TaskCreateRequest{}, errors.New("title is required")
@@ -1242,6 +1272,12 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 	if err := json.NewDecoder(body).Decode(&req); err != nil {
 		return domain.TaskUpdateRequest{}, err
 	}
+	if req.Kind != nil && !isAllowedTaskKind(string(*req.Kind)) {
+		return domain.TaskUpdateRequest{}, errors.New("kind must be task, bug, feature, chore, or spike")
+	}
+	if req.RootCauseAnalysis != nil && strings.TrimSpace(*req.RootCauseAnalysis) == "" {
+		return domain.TaskUpdateRequest{}, errors.New("root_cause_analysis cannot be empty")
+	}
 	if req.Title == nil &&
 		req.Description == nil &&
 		req.Priority == nil &&
@@ -1255,7 +1291,19 @@ func decodeTaskUpdateRequest(body io.Reader) (domain.TaskUpdateRequest, error) {
 		req.CompletionEvidence == nil {
 		return domain.TaskUpdateRequest{}, errors.New("at least one field must be provided")
 	}
+	if req.Status != nil && !isAllowedTaskStatus(string(*req.Status)) {
+		return domain.TaskUpdateRequest{}, errors.New("status must be todo, in_progress, completed, wont_fix, or archived")
+	}
 	return req, nil
+}
+
+func isAllowedTaskKind(value string) bool {
+	switch domain.TaskKind(strings.TrimSpace(value)) {
+	case domain.TaskKindTask, domain.TaskKindBug, domain.TaskKindFeature, domain.TaskKindChore, domain.TaskKindSpike:
+		return true
+	default:
+		return false
+	}
 }
 
 func isAllowedTaskStatus(value string) bool {

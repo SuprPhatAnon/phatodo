@@ -38,7 +38,7 @@ The manifests in `deploy/k3s/` deploy:
 - `phatodo-server` Deployment and Service
 - Postgres StatefulSet and Service
 - Postgres Secret
-- A one-shot migration Job that waits for Postgres, applies `migrations/0001_initial.sql`, and writes a `schema_migrations` marker
+- A one-shot migration Job that waits for Postgres, applies `migrations/*.sql`, and writes a `schema_migrations` marker
 - Traefik Ingress over plain HTTP by default
 
 TLS is optional. The checked-in k3s bundle does not require cert-manager or a certificate issuer to be present. If you want HTTPS later, add a separate TLS overlay or manifest rather than changing the default deployment path.
@@ -53,4 +53,4 @@ Apply and wait for rollout with:
 make deploy-k3s
 ```
 
-The deploy target creates `$(KUBE_NAMESPACE)` first with an idempotent `kubectl create namespace ... --dry-run=client -o yaml | kubectl apply -f -` step, refreshes the `phatodo-migrations` configmap from `migrations/0001_initial.sql`, deletes any previous migration Job, applies the k3s bundle, waits for `job/phatodo-migrate` to complete, updates the `phatodo-server` image to `$(KUBE_IMAGE)`, and waits for the rollout to finish.
+The deploy target creates `$(KUBE_NAMESPACE)` first with an idempotent `kubectl create namespace ... --dry-run=client -o yaml | kubectl apply -f -` step, refreshes the `phatodo-migrations` configmap from all `migrations/*.sql`, deletes any previous migration Job, applies the k3s bundle, waits for `job/phatodo-migrate` to complete, updates the `phatodo-server` image to `$(KUBE_IMAGE)`, and waits for the rollout to finish.

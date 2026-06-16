@@ -13,15 +13,15 @@ import (
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
 	id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, title, description, priority,
+	created_by, updated_by, title, description, kind, root_cause_analysis, priority,
 	status, tags, acceptance_criteria
 ) VALUES (
 	$1, $2, $3, NULLIF($4, ''),
 	NULLIF($5, ''), NULLIF($6, ''),
-	NULLIF($7, ''), NULL, $8, NULLIF($9, ''), $10,
-	'todo', $11, $12::jsonb
+	NULLIF($7, ''), NULL, $8, NULLIF($9, ''), $10, $11,
+	'todo', $12, $13::jsonb
 )
-RETURNING id, title, status, priority, project_id, workspace_id
+RETURNING id, title, status, priority, project_id, workspace_id, kind, root_cause_analysis
 `
 
 type CreateTaskParams struct {
@@ -34,18 +34,22 @@ type CreateTaskParams struct {
 	CreatedBy          interface{} `json:"created_by"`
 	Title              string      `json:"title"`
 	Description        interface{} `json:"description"`
+	Kind               string      `json:"kind"`
+	RootCauseAnalysis  string      `json:"root_cause_analysis"`
 	Priority           int32       `json:"priority"`
 	Tags               []string    `json:"tags"`
 	AcceptanceCriteria []byte      `json:"acceptance_criteria"`
 }
 
 type CreateTaskRow struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Status      string `json:"status"`
-	Priority    int32  `json:"priority"`
-	ProjectID   string `json:"project_id"`
-	WorkspaceID string `json:"workspace_id"`
+	ID                 string `json:"id"`
+	Title              string `json:"title"`
+	Status             string `json:"status"`
+	Priority           int32  `json:"priority"`
+	ProjectID          string `json:"project_id"`
+	WorkspaceID        string `json:"workspace_id"`
+	Kind               string `json:"kind"`
+	RootCauseAnalysis  string `json:"root_cause_analysis"`
 }
 
 func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateTaskRow, error) {
@@ -59,6 +63,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateT
 		arg.CreatedBy,
 		arg.Title,
 		arg.Description,
+		arg.Kind,
+		arg.RootCauseAnalysis,
 		arg.Priority,
 		arg.Tags,
 		arg.AcceptanceCriteria,
@@ -71,6 +77,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (CreateT
 		&i.Priority,
 		&i.ProjectID,
 		&i.WorkspaceID,
+		&i.Kind,
+		&i.RootCauseAnalysis,
 	)
 	return i, err
 }
@@ -79,7 +87,7 @@ const deleteTask = `-- name: DeleteTask :one
 DELETE FROM tasks
 WHERE project_id = $1 AND id = $2
 RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, completed_by, title, description, priority,
+	kind, root_cause_analysis, created_by, updated_by, completed_by, title, description, priority,
 	status, tags, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 `
@@ -98,6 +106,8 @@ func (q *Queries) DeleteTask(ctx context.Context, arg DeleteTaskParams) (Task, e
 		&i.ProjectID,
 		&i.EpicID,
 		&i.ParentTaskID,
+		&i.Kind,
+		&i.RootCauseAnalysis,
 		&i.AssignedTo,
 		&i.CreatedBy,
 		&i.UpdatedBy,
@@ -177,7 +187,7 @@ func (q *Queries) GetTaskCreateParentInfo(ctx context.Context, arg GetTaskCreate
 
 const getTaskDetail = `-- name: GetTaskDetail :one
 SELECT id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, completed_by, title, description, priority,
+	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
 	status, tags, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 FROM tasks
@@ -204,6 +214,8 @@ func (q *Queries) GetTaskDetail(ctx context.Context, arg GetTaskDetailParams) (T
 		&i.CompletedBy,
 		&i.Title,
 		&i.Description,
+		&i.Kind,
+		&i.RootCauseAnalysis,
 		&i.Priority,
 		&i.Status,
 		&i.Tags,
@@ -361,7 +373,7 @@ func (q *Queries) ListReadyTasks(ctx context.Context, arg ListReadyTasksParams) 
 }
 
 const listSubtasks = `-- name: ListSubtasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND parent_task_id = $2
@@ -380,6 +392,7 @@ type ListSubtasksRow struct {
 	Title        string    `json:"title"`
 	Status       string    `json:"status"`
 	Priority     int32     `json:"priority"`
+	Kind         string    `json:"kind"`
 	EpicID       *string   `json:"epic_id"`
 	ParentTaskID *string   `json:"parent_task_id"`
 	Tags         []string  `json:"tags"`
@@ -401,6 +414,7 @@ func (q *Queries) ListSubtasks(ctx context.Context, arg ListSubtasksParams) ([]L
 			&i.Title,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
@@ -418,7 +432,7 @@ func (q *Queries) ListSubtasks(ctx context.Context, arg ListSubtasksParams) ([]L
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT id, title, status, priority, epic_id, parent_task_id, tags, created_at, updated_at
+SELECT id, title, status, priority, kind, epic_id, parent_task_id, tags, created_at, updated_at
 FROM tasks
 WHERE project_id = $1
   AND parent_task_id IS NULL
@@ -438,6 +452,7 @@ type ListTasksRow struct {
 	Title        string    `json:"title"`
 	Status       string    `json:"status"`
 	Priority     int32     `json:"priority"`
+	Kind         string    `json:"kind"`
 	EpicID       *string   `json:"epic_id"`
 	ParentTaskID *string   `json:"parent_task_id"`
 	Tags         []string  `json:"tags"`
@@ -459,6 +474,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.Title,
 			&i.Status,
 			&i.Priority,
+			&i.Kind,
 			&i.EpicID,
 			&i.ParentTaskID,
 			&i.Tags,
@@ -504,25 +520,27 @@ SET updated_by = $1,
 	updated_at = now(),
 	title = COALESCE($2, title),
 	description = COALESCE($3, description),
-	priority = COALESCE($4, priority),
-	status = COALESCE($5, status),
-	tags = COALESCE($6, tags),
-	epic_id = CASE WHEN $7::bool THEN NULL ELSE COALESCE($8, epic_id) END,
-	assigned_to = COALESCE($9, assigned_to),
-	acceptance_criteria = COALESCE($10::jsonb, acceptance_criteria),
-	completion_summary = COALESCE($11, completion_summary),
-	completion_evidence = COALESCE($12::jsonb, completion_evidence),
+	kind = COALESCE($4, kind),
+	root_cause_analysis = COALESCE($5, root_cause_analysis),
+	priority = COALESCE($6, priority),
+	status = COALESCE($7, status),
+	tags = COALESCE($8, tags),
+	epic_id = CASE WHEN $9::bool THEN NULL ELSE COALESCE($10, epic_id) END,
+	assigned_to = COALESCE($11, assigned_to),
+	acceptance_criteria = COALESCE($12::jsonb, acceptance_criteria),
+	completion_summary = COALESCE($13, completion_summary),
+	completion_evidence = COALESCE($14::jsonb, completion_evidence),
 	completed_by = CASE
-		WHEN COALESCE($5, '') = 'completed' THEN COALESCE(NULLIF($1, ''), completed_by)
+		WHEN COALESCE($7, '') = 'completed' THEN COALESCE(NULLIF($1, ''), completed_by)
 		ELSE completed_by
 	END,
 	completed_at = CASE
-		WHEN COALESCE($5, '') = 'completed' THEN COALESCE(completed_at, now())
+		WHEN COALESCE($7, '') = 'completed' THEN COALESCE(completed_at, now())
 		ELSE completed_at
 	END
-WHERE project_id = $13 AND id = $14
+WHERE project_id = $15 AND id = $16
 RETURNING id, workspace_id, project_id, epic_id, parent_task_id, assigned_to,
-	created_by, updated_by, completed_by, title, description, priority,
+	created_by, updated_by, completed_by, title, description, kind, root_cause_analysis, priority,
 	status, tags, acceptance_criteria, completion_evidence, completion_summary,
 	completed_at, created_at, updated_at
 `
@@ -531,6 +549,8 @@ type UpdateTaskParams struct {
 	UpdatedBy          *string  `json:"updated_by"`
 	Title              *string  `json:"title"`
 	Description        *string  `json:"description"`
+	Kind               *string  `json:"kind"`
+	RootCauseAnalysis  *string  `json:"root_cause_analysis"`
 	Priority           *int32   `json:"priority"`
 	Status             *string  `json:"status"`
 	Tags               []string `json:"tags"`
@@ -549,6 +569,8 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		arg.UpdatedBy,
 		arg.Title,
 		arg.Description,
+		arg.Kind,
+		arg.RootCauseAnalysis,
 		arg.Priority,
 		arg.Status,
 		arg.Tags,
@@ -574,6 +596,8 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (Task, e
 		&i.CompletedBy,
 		&i.Title,
 		&i.Description,
+		&i.Kind,
+		&i.RootCauseAnalysis,
 		&i.Priority,
 		&i.Status,
 		&i.Tags,

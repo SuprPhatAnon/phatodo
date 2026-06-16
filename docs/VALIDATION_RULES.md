@@ -14,6 +14,19 @@ Allowed statuses:
 - `wont_fix`
 - `archived`
 
+Allowed task kinds:
+
+- `task`
+- `bug`
+- `feature`
+- `chore`
+- `spike`
+
+Bug-kind task rule:
+
+- `root_cause_analysis` is required for `kind=bug`
+- task kind defaults to `task` when omitted
+
 Recommended lifecycle:
 
 1. `todo`

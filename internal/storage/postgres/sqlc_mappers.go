@@ -12,6 +12,7 @@ func taskDetailFromSQLC(row db.Task) (domain.TaskDetail, error) {
 		ID:          row.ID,
 		WorkspaceID: row.WorkspaceID,
 		ProjectID:   row.ProjectID,
+		Kind:        domain.TaskKind(row.Kind),
 		Title:       row.Title,
 		Priority:    domain.Priority(row.Priority),
 		Status:      domain.Status(row.Status),
@@ -38,6 +39,7 @@ func taskDetailFromSQLC(row db.Task) (domain.TaskDetail, error) {
 	if row.Description != nil {
 		task.Description = *row.Description
 	}
+	task.RootCauseAnalysis = row.RootCauseAnalysis
 	if row.CompletionSummary != nil {
 		task.CompletionSummary = *row.CompletionSummary
 	}
@@ -67,6 +69,7 @@ func taskListItemFromSQLC(row db.ListTasksRow) domain.TaskListItem {
 		CreatedAt: row.CreatedAt,
 		UpdatedAt: row.UpdatedAt,
 	}
+	item.Kind = domain.TaskKind(row.Kind)
 	if row.EpicID != nil {
 		item.EpicID = *row.EpicID
 	}
@@ -167,6 +170,7 @@ func searchItemFromTaskSQLC(row db.SearchTasksRow) domain.SearchItem {
 		ID:          row.ID,
 		Title:       row.Title,
 		Description: row.Description,
+		Kind:        row.Kind,
 		Status:      domain.Status(row.Status),
 		Priority:    domain.Priority(row.Priority),
 		CreatedAt:   row.CreatedAt,

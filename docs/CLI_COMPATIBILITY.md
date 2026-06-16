@@ -33,6 +33,8 @@ The Trekker-compatible command surface is extended to cover schema-backed fields
 - `-a/--assigned-to` for task and epic ownership
 - `--criteria-json` for acceptance criteria
 - `--summary` and `--evidence-json` for completion metadata
+- `-k/--kind` for task kind
+- `--root-cause` / `--root-cause-analysis` for bug task root-cause capture
 - `-k/--kind` for comment type
 
 The criteria and evidence flags intentionally take JSON arrays because the server stores ordered lists for those fields. Use `description` for plain narrative text and `completion_summary` for a text summary of what was finished.
