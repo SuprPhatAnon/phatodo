@@ -5,13 +5,15 @@ GO := /usr/local/go/bin/go
 GOPATH := /home/bryan/gopath
 GOPRIVATE := github.com/phatanon
 GOFLAGS := GOPATH=$(GOPATH) GOPRIVATE=$(GOPRIVATE)
+INSTALL_BIN_DIR ?= /home/bryan/.local/bin
 REGISTRY ?= 10.80.0.85:30500
 TAG ?= latest
-SERVICE ?= all
-KUBE_NAMESPACE ?= phatodo
+KUBE_NAMESPACE := phatodo
 KUBE_ROLLOUT_TIMEOUT ?= 180s
-DOCKER_SERVICES ?= $(if $(filter all,$(SERVICE)),gateway market sports-mlb sports-mlb-audit sports-mlb-umpire-profiles models-mlb-mcmc-v2 migrate,$(SERVICE))
 IMAGE ?= $(REGISTRY)/phatodo:$(TAG)
+# IMAGE is the registry address reachable from this workstation for build/push.
+# KUBE_IMAGE is the image reference k3s nodes use when pulling from their
+# node-local registry mirror; it is intentionally different from IMAGE.
 KUBE_IMAGE ?= localhost:30500/phatodo:$(TAG)
 K3S_DIR ?= deploy/k3s
 GOCACHE ?= /tmp/phatodo-go-cache
@@ -24,7 +26,7 @@ help:
 	@echo "  build         Build CLI and server binaries"
 	@echo "  build-cli     Build the ptodo CLI"
 	@echo "  build-server  Build the phatodo-server API/dashboard"
-	@echo "  install       Build and install the ptodo CLI into $(GOPATH)/bin"
+	@echo "  install       Build and install the ptodo CLI into $(INSTALL_BIN_DIR)"
 	@echo "  test          Run all Go tests"
 	@echo "  test-cli      Run CLI package tests"
 	@echo "  test-server   Run server package tests"
@@ -41,7 +43,7 @@ help:
 	@echo "  compose-up    Start local Postgres and server"
 	@echo "  compose-down  Stop local Compose services"
 	@echo "  k3s-render    Render k3s manifests with kustomize"
-	@echo "  deploy        Deploy k3s manifests"
+	@echo "  deploy        Deploy k3s manifests using KUBE_IMAGE=$(KUBE_IMAGE)"
 	@echo "  clean         Remove local build output"
 
 build: build-cli build-server
@@ -55,8 +57,8 @@ build-server:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) build -o $(BIN_DIR)/phatodo-server ./cmd/phatodo-server
 
 install: build-cli
-	@mkdir -p /home/bryan/.local/bin
-	install -m 0755 $(BIN_DIR)/ptodo /home/bryan/.local/bin/ptodo
+	@mkdir -p $(INSTALL_BIN_DIR)
+	install -m 0755 $(BIN_DIR)/ptodo $(INSTALL_BIN_DIR)/ptodo
 
 test:
 	$(GOFLAGS) GOCACHE=$(GOCACHE) GOMODCACHE=$(GOMODCACHE) $(GO) test ./...
@@ -118,6 +120,7 @@ deploy-k3s:
 	kubectl apply -k $(K3S_DIR) -n $(KUBE_NAMESPACE)
 	kubectl wait --for=condition=complete job/phatodo-migrate -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)
 	kubectl set image deployment/phatodo-server phatodo-server=$(KUBE_IMAGE) -n $(KUBE_NAMESPACE)
+	kubectl rollout restart deployment/phatodo-server -n $(KUBE_NAMESPACE)
 	kubectl rollout status deployment/phatodo-server -n $(KUBE_NAMESPACE) --timeout=$(KUBE_ROLLOUT_TIMEOUT)
 
 clean:

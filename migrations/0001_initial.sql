@@ -142,10 +142,6 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-INSERT INTO schema_migrations (version)
-VALUES ('0001_initial')
-ON CONFLICT (version) DO NOTHING;
-
 CREATE TABLE IF NOT EXISTS comments (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
@@ -231,3 +227,7 @@ CREATE INDEX IF NOT EXISTS idx_events_created_at ON events(project_id, created_a
 CREATE UNIQUE INDEX IF NOT EXISTS idx_work_item_locks_active ON work_item_locks(project_id, entity_type, entity_id) WHERE released_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_search_document ON search_index USING GIN (document);
 CREATE INDEX IF NOT EXISTS idx_search_project_type ON search_index(project_id, entity_type);
+
+INSERT INTO schema_migrations (version)
+VALUES ('0001_initial')
+ON CONFLICT (version) DO NOTHING;

@@ -28,8 +28,16 @@ spec:
               until pg_isready -d "$PHATODO_DATABASE_URL"; do
                 sleep 2
               done
+              psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
               for migration in /migrations/*.sql; do
+                version="$(basename "$migration" .sql)"
+                if psql "$PHATODO_DATABASE_URL" -Atqc "SELECT 1 FROM schema_migrations WHERE version = '$version'" | grep -qx 1; then
+                  echo "Skipping already-applied migration: $version"
+                  continue
+                fi
+                echo "Applying migration: $version"
                 psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+                psql "$PHATODO_DATABASE_URL" -v ON_ERROR_STOP=1 -c "INSERT INTO schema_migrations (version) VALUES ('$version') ON CONFLICT (version) DO NOTHING"
               done
           volumeMounts:
             - name: migrations
