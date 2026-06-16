@@ -22,7 +22,7 @@ The CLI is a client. It should read local configuration for workspace ID, projec
 
 Postgres stores canonical state and audit history. Local `.phatodo` data should be limited to client configuration and optional cache data.
 
-The database model is documented in `docs/DATABASE_SCHEMA.md`. It follows Trekker's SQLite schema while adding a `workspaces` layer above individual projects and accountability fields for ownership, completion evidence, audit history, and time-bound work locks.
+The database model is documented in `docs/DATABASE_SCHEMA.md`. It follows Trekker's SQLite schema while adding a `workspaces` layer above individual projects and accountability fields for ownership, planned files, changed files, completion evidence, audit history, and time-bound work locks.
 
 All Postgres access should be defined in `sqlc` query files under `internal/storage/postgres/queries/` and regenerated through `make sqlc`; handwritten SQL in Go is not the intended steady-state.
 
@@ -30,7 +30,7 @@ Authentication is server-side. Users authenticate with an access key and access 
 
 ## API Scope
 
-The API should expose resources for epics, tasks, subtasks, comments, dependencies, config, search, history, and unified list views. Server-side validation should enforce lifecycle rules, including requiring a summary comment before task completion and checking completion evidence against explicit acceptance criteria.
+The API should expose resources for epics, tasks, subtasks, comments, dependencies, config, search, history, and unified list views. Server-side validation should enforce lifecycle rules, including requiring completion metadata before task completion and checking changed files plus completion evidence against explicit acceptance criteria.
 
 The non-dashboard API scaffold is documented in `docs/API.md`. It uses `/api/v1` routes, access-key headers, and project-scoped resource paths.
 

@@ -25,6 +25,8 @@ These fields may appear on epics, tasks, and subtasks depending on the command:
 - `created_by`
 - `updated_by`
 - `completed_by`
+- `planned_files`
+- `changed_files`
 - `acceptance_criteria`
 - `completion_evidence`
 - `completion_summary`

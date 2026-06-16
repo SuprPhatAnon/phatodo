@@ -12,7 +12,7 @@ ptodo config list            # Confirm access to the bootstrapped project
 2. Set status to `in_progress` when starting, `completed` when done
 3. Add a summary comment before marking work complete
 4. Use `--toon` for token-efficient output
-5. Keep descriptions as plain text; use `acceptance_criteria` and `completion_evidence` for ordered lists of requirements and proof
+5. Keep descriptions as plain text; use `planned_files`, `changed_files`, `acceptance_criteria`, and `completion_evidence` for ordered lists of requirements and proof
 6. Leave checkpoint comments when handing off context
 
 ## Commands
@@ -35,7 +35,7 @@ ptodo task delete <task-id>
 ### Updating Criteria and Evidence
 
 Use `--criteria-json` while work is still open to record what completion must satisfy.
-Use `--summary` and `--evidence-json` when the work is finished and you need to capture proof.
+Use `--summary`, `--changed-files-json`, and `--evidence-json` when the work is finished and you need to capture proof.
 
 Good usage:
 ptodo task update ABC-1 --criteria-json '["docs written","tests passing"]'
@@ -43,6 +43,7 @@ ptodo task update ABC-1 -s completed --summary "Implemented in internal/cli" --c
 
 Bad usage:
 ptodo task update ABC-1 -s completed --summary "Done" --evidence-json "fixed it"
+ptodo task update ABC-1 -s completed --summary "Done" --evidence-json '["tested"]'
 ptodo task update ABC-1 --description '["docs written","tests passing"]'
 
 ### Subtasks

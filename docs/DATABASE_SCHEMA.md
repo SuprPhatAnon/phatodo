@@ -9,7 +9,7 @@ The Postgres schema in `migrations/0001_initial.sql` is based on the schema crea
 - `users` are global server identities. `admin` users can access every workspace and project.
 - `user_project_access` locks a regular `user` to one project.
 - Project-owned tables carry both `workspace_id` and `project_id` so API queries can be scoped explicitly.
-- Work items carry explicit accountability metadata, including assignment, creator, updater, completion owner, completion timestamps, acceptance criteria, completion evidence, and time-bound locks.
+- Work items carry explicit accountability metadata, including assignment, creator, updater, completion owner, completion timestamps, planned files, changed files, acceptance criteria, completion evidence, and time-bound locks.
 
 The CLI should store only client configuration locally, such as API URL, workspace ID, project ID, access key, and access secret. Canonical task data belongs in Postgres.
 
